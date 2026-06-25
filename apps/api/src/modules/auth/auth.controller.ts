@@ -199,24 +199,48 @@ export const register = catchAsync(async (req: Request, res: Response) => {
   if (mode === "INVITE_ONLY")
     throw new AppError("Registration is by invitation only", HttpStatus.FORBIDDEN);
 
-  const { email, password, firstName, lastName } = req.body;
+  // 1. Capture target role from registration body (defaulting to USER/Customer)
+  const { email, password, firstName, lastName, role, businessName, phone, locationText } = req.body;
   if (!email || !password) throw new AppError("Email and password are required", HttpStatus.BAD_REQUEST);
 
   const existing = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
   if (existing) throw new AppError("Email already in use", HttpStatus.CONFLICT);
 
   const hashed = await authService.hashPassword(password);
-  const status  = mode === "SELF_REGISTER_AUTO" ? "ACTIVE" : "PENDING";
+  
+  // Vendors stay pending for approval, customers can be active immediately if mode allows
+  const targetRole = role === "VENDOR" ? "VENDOR" : "USER";
+  const status = targetRole === "VENDOR" ? "PENDING" : (mode === "SELF_REGISTER_AUTO" ? "ACTIVE" : "PENDING");
 
-  const user = await prisma.user.create({
-    data: {
-      email:         email.trim().toLowerCase(),
-      password:      hashed,
-      role:          "USER",
-      accountStatus: status,
-      firstName:     firstName ?? null,
-      lastName:      lastName  ?? null,
-    },
+  // 2. Create the user + vendor profile atomically so no orphaned users exist
+  const user = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: {
+        email:         email.trim().toLowerCase(),
+        password:      hashed,
+        role:          targetRole,
+        accountStatus: status,
+        firstName:     firstName ?? null,
+        lastName:      lastName  ?? null,
+        displayName:   targetRole === "VENDOR" && businessName ? businessName : `${firstName ?? ''} ${lastName ?? ''}`.trim(),
+      },
+    });
+
+    if (targetRole === "VENDOR") {
+      await tx.vendorProfile.create({
+        data: {
+          userId:      newUser.id,
+          businessName: businessName || "My Business",
+          phone:        phone        || null,
+          locationText: locationText || null,
+          isActive:     false,
+          bankDetails:  null,
+          proofDocs:    null,
+        },
+      });
+    }
+
+    return newUser;
   });
 
   await prisma.auditLog.create({
@@ -224,7 +248,7 @@ export const register = catchAsync(async (req: Request, res: Response) => {
   });
   req.auditLogged = true;
 
-  if (mode === "SELF_REGISTER_AUTO") {
+  if (status === "ACTIVE") {
     const token = authService.generateToken(user.id, user.role);
     setAuthCookie(res, token);
     return res.status(HttpStatus.CREATED).json({
@@ -235,6 +259,8 @@ export const register = catchAsync(async (req: Request, res: Response) => {
 
   return res.status(HttpStatus.CREATED).json({
     status:  "success",
-    message: "Registration successful. An admin will review your account.",
+    message: targetRole === "VENDOR" 
+      ? "Vendor registration successful! Your application is pending admin approval."
+      : "Registration successful. Welcome aboard!",
   });
 });

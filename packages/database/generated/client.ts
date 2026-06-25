@@ -61,3 +61,23 @@ export type Notification = Prisma.NotificationModel
  * 
  */
 export type SystemSetting = Prisma.SystemSettingModel
+/**
+ * Model VendorProfile
+ * 
+ */
+export type VendorProfile = Prisma.VendorProfileModel
+/**
+ * Model Service
+ * 
+ */
+export type Service = Prisma.ServiceModel
+/**
+ * Model Review
+ * 
+ */
+export type Review = Prisma.ReviewModel
+/**
+ * Model Booking
+ * 
+ */
+export type Booking = Prisma.BookingModel

@@ -6,11 +6,12 @@ import Link from "next/link";
 import { useAuth } from "@/shared/context/AuthContext";
 import { Suspense } from "react";
 
+// Synchronized application role-routing configuration map
 const ROLE_ROUTES: Record<string, string> = {
   SUPER_ADMIN: "/super-admin",
-  ADMIN:       "/admin",
-  MANAGER:     "/manager",
-  USER:        "/user",
+  ADMIN:       "/vendors", // Your administrative entry panel
+  VENDOR:      "/dashboard",
+  USER:        "/services", // Clean fallback for classic customer users
 };
 
 const OAUTH_ERRORS: Record<string, string> = {
@@ -28,6 +29,7 @@ function RegisterContent() {
 
   useEffect(() => {
     if (!isLoading && user) {
+      // Intelligently pushes user based on exact authenticated role assignment
       router.push(ROLE_ROUTES[user.role] ?? "/");
     }
   }, [user, isLoading, router]);

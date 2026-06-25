@@ -1,7 +1,8 @@
 import { Router } from "express";
 import {
   adminDashboard, listUsers, inviteUser, updateUserStatus, updateUserRole,
-  inviteManager, listManagers, adminActivity,
+  inviteManager, listManagers, adminActivity, listPendingVendors, approveVendor,
+  listAllVendors, updateVendorStatus, listAllServices, approveService, rejectService, verifyVendor,
 } from "./admin.controller.js";
 import { protect }   from "../../middleware/auth.middleware.js";
 import { authorize } from "../../middleware/role.middleware.js";
@@ -16,12 +17,22 @@ router.get("/activity",           adminActivity);
 
 // Users
 router.get("/users",              listUsers);
+router.get("/vendors",             listAllVendors);
+router.get("/vendors/pending",     listPendingVendors);
+router.patch("/vendors/:id/status", updateVendorStatus);
 router.post("/users/invite",      inviteUser);
 router.patch("/users/:id/status", updateUserStatus);
 router.patch("/users/:id/role",   updateUserRole);
+router.patch("/vendors/:id/approve", approveVendor);
+router.patch("/vendors/:id/verify",  verifyVendor);
 
 // Managers
 router.get("/managers",           listManagers);
 router.post("/managers/invite",   inviteManager);
+
+// Services
+router.get("/services",                listAllServices);
+router.patch("/services/:id/approve",  approveService);
+router.patch("/services/:id/reject",   rejectService);
 
 export default router;

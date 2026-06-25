@@ -13,10 +13,23 @@ export const Role = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   ADMIN: 'ADMIN',
   MANAGER: 'MANAGER',
-  USER: 'USER'
+  USER: 'USER',
+  VENDOR: 'VENDOR',
+  CLIENT: 'CLIENT'
 } as const
 
 export type Role = (typeof Role)[keyof typeof Role]
+
+
+export const BookingStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED'
+} as const
+
+export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus]
 
 
 export const AccountStatus = {

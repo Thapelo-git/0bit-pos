@@ -54,7 +54,11 @@ export const ModelName = {
   User: 'User',
   AuditLog: 'AuditLog',
   Notification: 'Notification',
-  SystemSetting: 'SystemSetting'
+  SystemSetting: 'SystemSetting',
+  VendorProfile: 'VendorProfile',
+  Service: 'Service',
+  Review: 'Review',
+  Booking: 'Booking'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -138,6 +142,71 @@ export const SystemSettingScalarFieldEnum = {
 } as const
 
 export type SystemSettingScalarFieldEnum = (typeof SystemSettingScalarFieldEnum)[keyof typeof SystemSettingScalarFieldEnum]
+
+
+export const VendorProfileScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  businessName: 'businessName',
+  description: 'description',
+  latitude: 'latitude',
+  longitude: 'longitude',
+  isActive: 'isActive',
+  isVerified: 'isVerified',
+  phone: 'phone',
+  bankDetails: 'bankDetails',
+  proofDocs: 'proofDocs',
+  locationText: 'locationText',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VendorProfileScalarFieldEnum = (typeof VendorProfileScalarFieldEnum)[keyof typeof VendorProfileScalarFieldEnum]
+
+
+export const ServiceScalarFieldEnum = {
+  id: 'id',
+  vendorProfileId: 'vendorProfileId',
+  name: 'name',
+  description: 'description',
+  price: 'price',
+  category: 'category',
+  imageUrl: 'imageUrl',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ServiceScalarFieldEnum = (typeof ServiceScalarFieldEnum)[keyof typeof ServiceScalarFieldEnum]
+
+
+export const ReviewScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  serviceId: 'serviceId',
+  rating: 'rating',
+  comment: 'comment',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ReviewScalarFieldEnum = (typeof ReviewScalarFieldEnum)[keyof typeof ReviewScalarFieldEnum]
+
+
+export const BookingScalarFieldEnum = {
+  id: 'id',
+  clientId: 'clientId',
+  serviceId: 'serviceId',
+  status: 'status',
+  totalAmount: 'totalAmount',
+  notes: 'notes',
+  address: 'address',
+  paymentMethod: 'paymentMethod',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type BookingScalarFieldEnum = (typeof BookingScalarFieldEnum)[keyof typeof BookingScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -14,6 +14,24 @@ export interface TeamUser {
   updatedAt: string;
 }
 
+export interface PendingVendor {
+  id: string;
+  email: string;
+  displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  accountStatus: string;
+  createdAt: string;
+  vendorProfile: {
+    businessName: string;
+    description: string;
+    phone: string;
+    bankDetails: string;
+    proofDocs: string;
+    locationText: string;
+  } | null;
+}
+
 export const adminService = {
   async getDashboard() {
     const { data } = await apiClient.get(endpoints.admin.dashboard);
@@ -22,6 +40,16 @@ export const adminService = {
 
   async getManagers(): Promise<{ data: { managers: TeamUser[] } }> {
     const { data } = await apiClient.get(endpoints.admin.managers);
+    return data;
+  },
+
+  async getPendingVendors(): Promise<{ data: { vendors: PendingVendor[] } }> {
+    const { data } = await apiClient.get(endpoints.admin.pendingVendors);
+    return data;
+  },
+
+  async approveVendor(id: string) {
+    const { data } = await apiClient.patch(endpoints.admin.approveVendor(id), { });
     return data;
   },
 

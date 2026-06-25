@@ -3,6 +3,8 @@ export enum Role {
   ADMIN       = "ADMIN",
   MANAGER     = "MANAGER",
   USER        = "USER",
+  VENDOR      = "VENDOR",
+  CLIENT      = "CLIENT",
 }
 
 export enum AccountStatus {

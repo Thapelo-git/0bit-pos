@@ -12,6 +12,16 @@ enum Role {
   ADMIN
   MANAGER
   USER
+  VENDOR
+  CLIENT
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  CANCELLED
 }
 
 enum AccountStatus {
@@ -59,6 +69,10 @@ model User {
   auditLogs     AuditLog[]
   notifications Notification[]
 
+  vendorProfile  VendorProfile?
+  clientBookings Booking[]      @relation("ClientBookings")
+  reviews        Review[]       @relation("ClientReviews")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -101,4 +115,80 @@ model SystemSetting {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model VendorProfile {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName String
+  description  String?
+  latitude     Float?
+  longitude    Float?
+  isActive     Boolean   @default(true)
+  isVerified   Boolean   @default(false)
+  services     Service[]
+
+  phone        String?
+  bankDetails  String?
+  proofDocs    String?
+  locationText String?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Service {
+  id              String        @id @default(cuid())
+  vendorProfileId String
+  vendorProfile   VendorProfile @relation(fields: [vendorProfileId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  price           Float
+  category        String
+  imageUrl        String?
+  isActive        Boolean       @default(false)
+  bookings        Booking[]
+  reviews         Review[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([vendorProfileId])
+  @@index([category])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    User     @relation("ClientReviews", fields: [clientId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, serviceId])
+  @@index([serviceId])
+  @@index([clientId])
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  clientId      String
+  client        User          @relation("ClientBookings", fields: [clientId], references: [id], onDelete: Cascade)
+  serviceId     String
+  service       Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  status        BookingStatus @default(PENDING)
+  totalAmount   Float
+  notes         String?
+  address       String?
+  paymentMethod String?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([serviceId])
 }

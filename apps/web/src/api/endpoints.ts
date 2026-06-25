@@ -39,13 +39,21 @@ export const endpoints = {
 
   // Admin
   admin: {
-    dashboard:    "/admin/dashboard",
-    users:        "/admin/users",
-    userStatus:   (id: string) => `/admin/users/${id}/status`,
-    userRole:     (id: string) => `/admin/users/${id}/role`,
-    userInvite:    "/admin/users/invite",
-    managers:      "/admin/managers",
-    managerInvite: "/admin/managers/invite",
+    dashboard:      "/admin/dashboard",
+    users:          "/admin/users",
+    userStatus:     (id: string) => `/admin/users/${id}/status`,
+    userRole:       (id: string) => `/admin/users/${id}/role`,
+    userInvite:      "/admin/users/invite",
+    managers:        "/admin/managers",
+    managerInvite:   "/admin/managers/invite",
+    pendingVendors:  "/admin/vendors/pending",
+    approveVendor:   (id: string) => `/admin/vendors/${id}/approve`,
+  },
+
+  // Vendor
+  vendor: {
+    signup:   "/vendors/signup",
+    dashboard: "/vendors/dashboard",
   },
 
   // Projects

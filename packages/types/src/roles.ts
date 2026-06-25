@@ -28,6 +28,8 @@ export const ROLE_PERMISSIONS: Record<UserRoleType, PermissionType[]> = {
   USER: [
     PERMISSIONS.VIEW_OWN_PROJECT,
   ],
+  VENDOR: [],
+  CLIENT: [],
 };
 
 export const hasPermission = (

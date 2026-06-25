@@ -23,6 +23,9 @@ import userRoutes         from "./modules/users/user.routes.js";
 import adminRoutes        from "./modules/admin/admin.routes.js";
 import superAdminRoutes   from "./modules/super-admin/super-admin.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
+import vendorRoutes       from "./modules/vendors/vendors.routes.js";
+import clientRoutes       from "./modules/clients/clients.routes.js";
+import bookingRoutes      from "./modules/bookings/bookings.routes.js";
 
 const app: Express = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -75,6 +78,9 @@ app.use(`${API}/users`,         userRoutes);
 app.use(`${API}/admin`,         adminRoutes);
 app.use(`${API}/super-admin`,   superAdminRoutes);
 app.use(`${API}/notifications`, notificationRoutes);
+app.use(`${API}/vendors`,       vendorRoutes);
+app.use(`${API}/clients`,       clientRoutes);
+app.use(`${API}/bookings`,      bookingRoutes);
 
 // ── 6. 404 ────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {
@@ -100,6 +106,20 @@ const PORT = process.env.PORT || 3001;
     console.log(`🔗  URL:    http://localhost:${PORT}${API}`);
     console.log(`─────────────────────────────────────────\n`);
   });
+})();
+// Auto-unlock registrations on boot
+(async () => {
+  try {
+    const { prisma } = await import("@repo/database");
+    await prisma.systemSetting.upsert({
+      where: { key: "registration_mode" },
+      update: { value: "SELF_REGISTER" },
+      create: { key: "registration_mode", value: "SELF_REGISTER" }
+    });
+    console.log("🔓 [System Setup]: Registration mode set to public.");
+  } catch (err) {
+    console.error("⚠️ [System Setup] Configuration error:", err);
+  }
 })();
 
 export default app;

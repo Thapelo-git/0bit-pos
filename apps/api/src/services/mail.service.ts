@@ -79,6 +79,29 @@ export async function sendPasswordResetEmail(
   });
 }
 
+// ── Vendor approval email ────────────────────────────────────────────────────
+
+export async function sendVendorApprovalEmail(
+  to: string, loginLink: string, name: string
+) {
+  await send({
+    from:    FROM,
+    to,
+    subject: `Your ${APP} vendor account is approved`,
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+        <h2>Congratulations, ${name}</h2>
+        <p>Your vendor account has been approved and is now active.</p>
+        <p>You can now log in, list services, and take orders on ${APP}.</p>
+        <a href="${loginLink}" style="display:inline-block;padding:12px 24px;background:#84cc16;color:#0f172a;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">
+          Go to Dashboard
+        </a>
+        <p style="color:#666;font-size:13px">If you have questions, reply to this email.</p>
+      </div>
+    `,
+  });
+}
+
 // ── Verification code email ────────────────────────────────────────────────────
 
 export async function sendVerificationCodeEmail(
