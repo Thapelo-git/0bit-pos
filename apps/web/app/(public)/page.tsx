@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -87,7 +87,7 @@ function TrustSection() {
   );
 }
 
-export default function LandingPage() {
+function LandingPage() {
   const [deals, setDeals] = useState<any[]>([]);
   const searchParams = useSearchParams();
   const cat = searchParams.get("category");
@@ -288,6 +288,14 @@ export default function LandingPage() {
         <Link href="/login" className="vendor-cta-btn">Start Listing Free →</Link>
       </div>
     </>
+  );
+}
+
+export default function LandingPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <LandingPage />
+    </Suspense>
   );
 }
 
