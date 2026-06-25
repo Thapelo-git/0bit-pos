@@ -98,7 +98,8 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { count: cartCount } = useCart();
 
-  const [authUser, setAuthUser] = useState<{ role: string; displayName?: string; firstName?: string } | null>(null);
+  const [authUser,     setAuthUser]     = useState<{ role: string; displayName?: string; firstName?: string } | null>(null);
+  const [acctDropOpen, setAcctDropOpen] = useState(false);
 
   useEffect(() => {
     const checkAuth = () => {
@@ -108,11 +109,27 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
         .catch(() => setAuthUser(null));
     };
     checkAuth();
-    // Re-check when user navigates back to this tab after logout elsewhere
     const onVisible = () => { if (document.visibilityState === "visible") checkAuth(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!acctDropOpen) return;
+    const handler = () => setAcctDropOpen(false);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [acctDropOpen]);
+
+  const handleLogout = async () => {
+    setAcctDropOpen(false);
+    try {
+      await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" });
+    } catch {}
+    setAuthUser(null);
+    router.push("/login");
+  };
 
   const isHome = pathname === "/";
 
@@ -126,25 +143,55 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
   return (
     <>
       <style>{`
+        * { box-sizing:border-box; }
         .pub-layout       { min-height:100vh; background:#fff; font-family:sans-serif; }
-        .top-banner       { background:${RED}; color:#fff; text-align:center; font-size:12px; padding:8px 16px; font-weight:600; }
+        .top-banner       { background:${RED}; color:#fff; text-align:center; font-size:12px; padding:7px 16px; font-weight:600; }
 
-        /* Header */
-        .pub-header       { border-bottom:1px solid #eaeaea; padding:14px 40px; display:flex; align-items:center; justify-content:space-between; gap:16px; position:sticky; top:0; background:#fff; z-index:100; }
-        .pub-logo         { text-decoration:none; color:${RED}; font-size:26px; font-weight:900; letter-spacing:-0.5px; flex-shrink:0; }
-        .pub-search-form  { display:flex; flex:1; max-width:480px; margin:0 16px; }
-        .pub-search-input { flex:1; padding:10px 16px; border-radius:6px 0 0 6px; border:1.5px solid #eaeaea; border-right:none; font-size:14px; outline:none; }
+        /* ── Header ──────────────────────────────────────────────────── */
+        .pub-header       { border-bottom:1px solid #eaeaea; position:sticky; top:0; background:#fff; z-index:100; }
+
+        /* Main row: logo | search | actions — always visible */
+        .header-row       { display:flex; align-items:center; height:64px; padding:0 40px; gap:20px; }
+
+        /* Logo */
+        .pub-logo         { text-decoration:none; color:${RED}; font-size:26px; font-weight:900; letter-spacing:-1px; flex-shrink:0; line-height:1; }
+
+        /* Search (desktop) */
+        .pub-search-form  { flex:1; max-width:500px; display:flex; align-items:center; }
+        .pub-search-input { flex:1; min-width:0; height:42px; padding:0 16px; border:1.5px solid #e5e7eb; border-right:none; border-radius:8px 0 0 8px; font-size:14px; outline:none; }
         .pub-search-input:focus { border-color:${RED}; }
-        .pub-search-btn   { background:${RED}; color:#fff; border:none; padding:10px 18px; border-radius:0 6px 6px 0; cursor:pointer; font-weight:700; font-size:14px; }
-        .pub-nav-right    { display:flex; align-items:center; gap:20px; }
-        .pub-sign-in      { text-decoration:none; display:flex; flex-direction:column; align-items:flex-end; cursor:pointer; }
-        .pub-sign-in-top  { font-size:11px; color:#71717A; }
-        .pub-sign-in-btm  { font-size:14px; font-weight:700; color:#0A0A0A; }
-        .pub-icon-btn     { position:relative; cursor:pointer; color:#0A0A0A; text-decoration:none; font-size:20px; }
-        .pub-icon-badge   { position:absolute; top:-6px; right:-10px; background:${RED}; color:#fff; border-radius:50%; padding:2px 6px; font-size:10px; font-weight:700; }
-        .hamburger        { display:none; background:none; border:none; cursor:pointer; font-size:24px; color:#0A0A0A; padding:4px; }
+        .pub-search-btn   { height:42px; padding:0 18px; background:${RED}; color:#fff; border:none; border-radius:0 8px 8px 0; cursor:pointer; font-weight:700; font-size:14px; white-space:nowrap; flex-shrink:0; }
 
-        /* Main container */
+        /* Right actions */
+        .header-actions   { display:flex; align-items:center; gap:4px; margin-left:auto; flex-shrink:0; }
+        .pub-sign-in      { text-decoration:none; display:flex; flex-direction:column; justify-content:center; cursor:pointer; padding:6px 10px; border-radius:8px; position:relative; }
+        .pub-sign-in:hover{ background:#f9fafb; }
+        .pub-sign-in-top  { font-size:10px; color:#9ca3af; font-weight:600; line-height:1.2; }
+        .pub-sign-in-btm  { font-size:13px; font-weight:800; color:#0A0A0A; line-height:1.3; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        /* Account dropdown */
+        .acct-wrap        { position:relative; }
+        .acct-btn         { display:flex; flex-direction:column; justify-content:center; cursor:pointer; padding:6px 10px; border-radius:8px; border:none; background:none; text-align:left; }
+        .acct-btn:hover   { background:#f9fafb; }
+        .acct-drop        { position:absolute; top:calc(100% + 6px); right:0; background:#fff; border:1.5px solid #eaeaea; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.1); min-width:180px; z-index:300; overflow:hidden; }
+        .acct-drop-item   { display:flex; align-items:center; gap:10px; padding:11px 16px; font-size:13px; font-weight:600; color:#374151; cursor:pointer; text-decoration:none; border:none; background:none; width:100%; text-align:left; font-family:sans-serif; }
+        .acct-drop-item:hover { background:#f9fafb; color:#0A0A0A; }
+        .acct-drop-item.danger { color:#dc2626; }
+        .acct-drop-item.danger:hover { background:#fef2f2; }
+        .acct-drop-div    { border-top:1px solid #eaeaea; margin:4px 0; }
+        .pub-icon-btn     { position:relative; cursor:pointer; color:#374151; text-decoration:none; font-size:22px; padding:8px 10px; border-radius:8px; display:flex; align-items:center; }
+        .pub-icon-btn:hover { background:#f9fafb; }
+        .pub-icon-badge   { position:absolute; top:2px; right:2px; background:${RED}; color:#fff; border-radius:50%; min-width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; padding:0 3px; }
+        .hamburger        { display:none; background:none; border:none; cursor:pointer; font-size:22px; color:#374151; padding:8px; border-radius:8px; }
+        .hamburger:hover  { background:#f9fafb; }
+
+        /* Mobile search row (below header-row) */
+        .mob-search       { display:none; padding:0 14px 10px; }
+        .mob-search form  { display:flex; width:100%; }
+        .mob-search input { flex:1; min-width:0; height:42px; padding:0 14px; border:1.5px solid #e5e7eb; border-right:none; border-radius:8px 0 0 8px; font-size:16px; outline:none; }
+        .mob-search input:focus { border-color:${RED}; }
+        .mob-search button{ height:42px; padding:0 16px; background:${RED}; color:#fff; border:none; border-radius:0 8px 8px 0; font-weight:700; font-size:14px; cursor:pointer; white-space:nowrap; font-family:sans-serif; }
+
+        /* ── Main container ──────────────────────────────────────────── */
         .pub-container    { display:flex; max-width:1400px; margin:0 auto; padding:20px; gap:30px; }
         .pub-sidebar      { width:240px; flex-shrink:0; }
         .pub-main         { flex:1; min-width:0; }
@@ -154,12 +201,12 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
         .sidebar-heading  { padding:14px 16px; font-weight:700; font-size:14px; border-bottom:1px solid #eaeaea; background:#fdfdfd; }
         .sidebar-price    { padding:16px; }
         .sidebar-price label { font-size:11px; color:#71717A; display:block; margin-bottom:4px; }
-        .sidebar-price input { width:100%; padding:8px; border:1px solid #eaeaea; border-radius:4px; font-size:13px; box-sizing:border-box; }
+        .sidebar-price input { width:100%; padding:8px; border:1px solid #eaeaea; border-radius:4px; font-size:13px; }
         .sidebar-filter-btn { width:100%; padding:9px; background:#eaeaea; border:none; border-radius:4px; font-weight:700; cursor:pointer; margin-top:12px; font-size:13px; }
 
         /* Sub-nav */
-        .sub-nav          { display:flex; gap:24px; margin-bottom:20px; font-weight:700; font-size:14px; border-bottom:1px solid #eaeaea; padding-bottom:0; }
-        .sub-nav a        { text-decoration:none; padding-bottom:12px; color:#71717A; border-bottom:2px solid transparent; }
+        .sub-nav          { display:flex; gap:24px; margin-bottom:20px; font-weight:700; font-size:14px; border-bottom:1px solid #eaeaea; }
+        .sub-nav a        { text-decoration:none; padding-bottom:12px; color:#71717A; border-bottom:2px solid transparent; white-space:nowrap; }
         .sub-nav a.active { color:${RED}; border-bottom-color:${RED}; }
 
         /* Mobile drawer */
@@ -170,16 +217,24 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
         .mobile-close     { float:right; background:none; border:none; font-size:22px; cursor:pointer; color:#0A0A0A; }
         .mobile-logo      { color:${RED}; font-size:24px; font-weight:900; margin-bottom:24px; display:block; }
 
-        @media (max-width: 900px) {
+        @media (max-width:900px) {
           .pub-sidebar    { display:none; }
+          .header-row     { padding:0 20px; }
         }
-        @media (max-width: 640px) {
-          .pub-header     { padding:12px 16px; }
-          .pub-search-form{ display:none; }
-          .hamburger      { display:block; }
-          .pub-sign-in    { display:none; }
-          .pub-container  { padding:14px; }
-          .sub-nav        { gap:14px; font-size:13px; overflow-x:auto; }
+        @media (max-width:640px) {
+          .header-row       { height:54px; padding:0 14px; gap:4px; }
+          .pub-logo         { font-size:22px; }
+          .pub-search-form  { display:none; }
+          .mob-search       { display:block; }
+          .hamburger        { display:flex; align-items:center; }
+          .pub-sign-in      { display:none; }
+          .header-actions   { gap:0; }
+          .pub-container    { padding:12px 14px; }
+          .sub-nav          { gap:10px; font-size:12px; overflow-x:auto; }
+          .sub-nav::-webkit-scrollbar { display:none; }
+        }
+        @media (max-width:360px) {
+          .mob-search button { padding:0 12px; font-size:13px; }
         }
       `}</style>
 
@@ -191,49 +246,98 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
 
         {/* Header */}
         <header className="pub-header">
-          <Link href="/" className="pub-logo">kasiFix</Link>
+          {/* ── Main row ── */}
+          <div className="header-row">
+            <Link href="/" className="pub-logo">kasiFix</Link>
 
-          {/* Desktop search */}
-          <form className="pub-search-form" onSubmit={handleSearch}>
-            <input
-              className="pub-search-input"
-              type="text"
-              placeholder="Search for a service..."
-              value={searchValue}
-              onChange={e => setSearchValue(e.target.value)}
-            />
-            <button className="pub-search-btn" type="submit">Search</button>
-          </form>
+            {/* Desktop search */}
+            <form className="pub-search-form" onSubmit={handleSearch}>
+              <input
+                className="pub-search-input"
+                type="text"
+                placeholder="Search for a service…"
+                value={searchValue}
+                onChange={e => setSearchValue(e.target.value)}
+              />
+              <button className="pub-search-btn" type="submit">Search</button>
+            </form>
 
-          {/* Right-side nav */}
-          <div className="pub-nav-right">
-            {authUser ? (
-              <Link
-                href={authUser.role === "VENDOR" ? "/dashboard" : authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN" ? "/vendors" : "/"}
-                className="pub-sign-in"
-              >
-                <span className="pub-sign-in-top">
-                  {authUser.role === "VENDOR" ? "Vendor Portal" : authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN" ? "Admin Panel" : "My Account"}
-                </span>
-                <span className="pub-sign-in-btm">
-                  {authUser.displayName || authUser.firstName || "Dashboard"} →
-                </span>
+            {/* Right actions */}
+            <div className="header-actions">
+              {authUser ? (
+                /* ── Logged-in account dropdown ── */
+                <div className="acct-wrap" onClick={e => e.stopPropagation()}>
+                  <button
+                    className="acct-btn"
+                    onClick={() => setAcctDropOpen(o => !o)}
+                    aria-label="Account menu"
+                  >
+                    <span className="pub-sign-in-top">
+                      {authUser.role === "VENDOR" ? "Vendor" : authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN" ? "Admin" : "Hi,"}
+                    </span>
+                    <span className="pub-sign-in-btm">
+                      {authUser.displayName || authUser.firstName || "Account"} ▾
+                    </span>
+                  </button>
+
+                  {acctDropOpen && (
+                    <div className="acct-drop">
+                      {/* Role-based portal link */}
+                      {authUser.role === "VENDOR" && (
+                        <Link href="/dashboard" className="acct-drop-item" onClick={() => setAcctDropOpen(false)}>
+                          🏪 Vendor Dashboard
+                        </Link>
+                      )}
+                      {(authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN") && (
+                        <Link href="/vendors" className="acct-drop-item" onClick={() => setAcctDropOpen(false)}>
+                          ⚙️ Admin Panel
+                        </Link>
+                      )}
+                      {(authUser.role === "USER" || authUser.role === "CLIENT") && (
+                        <>
+                          <Link href="/my-orders" className="acct-drop-item" onClick={() => setAcctDropOpen(false)}>
+                            📋 My Orders
+                          </Link>
+                          <Link href="/favorites" className="acct-drop-item" onClick={() => setAcctDropOpen(false)}>
+                            ♡ My Favourites
+                          </Link>
+                        </>
+                      )}
+                      <div className="acct-drop-div" />
+                      <button className="acct-drop-item danger" onClick={handleLogout}>
+                        ↩ Sign Out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link href="/login" className="pub-sign-in">
+                  <span className="pub-sign-in-top">Welcome</span>
+                  <span className="pub-sign-in-btm">Sign In</span>
+                </Link>
+              )}
+
+              <Link href="/favorites" className="pub-icon-btn" title="Favourites">♡</Link>
+
+              <Link href="/cart" className="pub-icon-btn" title="My Booking">
+                📋{cartCount > 0 && <span className="pub-icon-badge">{cartCount}</span>}
               </Link>
-            ) : (
-              <Link href="/login" className="pub-sign-in">
-                <span className="pub-sign-in-top">Sign In</span>
-                <span className="pub-sign-in-btm">Account</span>
-              </Link>
-            )}
-            <Link href="/favorites" className="pub-icon-btn" title="Favourites">
-              ♡
-            </Link>
-            <Link href="/cart" className="pub-icon-btn" style={{ marginLeft: "8px" }} title="Cart">
-              🛒{cartCount > 0 && <span className="pub-icon-badge">{cartCount}</span>}
-            </Link>
-            <button className="hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Menu">
-              ☰
-            </button>
+
+              <button className="hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">☰</button>
+            </div>
+          </div>
+
+          {/* ── Mobile search row (below header-row on small screens) ── */}
+          <div className="mob-search">
+            <form onSubmit={handleSearch}>
+              <input
+                type="text"
+                placeholder="Search services…"
+                value={searchValue}
+                onChange={e => setSearchValue(e.target.value)}
+              />
+              <button type="submit">Search</button>
+            </form>
           </div>
         </header>
 
@@ -267,24 +371,6 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
             </Suspense>
             {children}
           </main>
-        </div>
-
-        {/* Mobile search (bottom of page) — always available on small screens */}
-        <div style={{
-          display: "none", position: "fixed", bottom: "16px", left: "16px", right: "16px", zIndex: 99
-        }} className="mobile-search-bar">
-          <form onSubmit={handleSearch} style={{ display: "flex", boxShadow: "0 4px 20px rgba(0,0,0,.15)", borderRadius: "8px", overflow: "hidden" }}>
-            <input
-              type="text"
-              placeholder="Search services..."
-              value={searchValue}
-              onChange={e => setSearchValue(e.target.value)}
-              style={{ flex: 1, padding: "13px 16px", border: "none", fontSize: "14px", outline: "none" }}
-            />
-            <button type="submit" style={{ background: RED, color: "#fff", border: "none", padding: "13px 18px", fontWeight: 700, cursor: "pointer" }}>
-              →
-            </button>
-          </form>
         </div>
 
         {/* Mobile drawer */}
@@ -324,19 +410,84 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
 
-            <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "12px" }}>
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)} style={{
-                display: "block", background: RED, color: "#fff", textAlign: "center",
-                padding: "13px", borderRadius: "8px", fontWeight: 700, textDecoration: "none"
-              }}>
-                Sign In / Register
-              </Link>
-              <Link href="/services" onClick={() => setMobileMenuOpen(false)} style={{
-                display: "block", border: `1px solid ${RED}`, color: RED, textAlign: "center",
-                padding: "12px", borderRadius: "8px", fontWeight: 700, textDecoration: "none"
-              }}>
-                Browse All Services
-              </Link>
+            <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              {authUser ? (
+                <>
+                  {/* Logged-in user info */}
+                  <div style={{ padding: "12px 14px", background: "#f9fafb", borderRadius: "10px", marginBottom: 4 }}>
+                    <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>Signed in as</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#0A0A0A", marginTop: 2 }}>
+                      {authUser.displayName || authUser.firstName || "Account"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#71717A", marginTop: 1, textTransform: "capitalize" }}>
+                      {authUser.role === "SUPER_ADMIN" ? "Super Admin" : authUser.role.toLowerCase()} account
+                    </div>
+                  </div>
+
+                  {(authUser.role === "USER" || authUser.role === "CLIENT") && (
+                    <>
+                      <Link href="/my-orders" onClick={() => setMobileMenuOpen(false)} style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+                        background: "#fff", border: "1.5px solid #eaeaea", borderRadius: "8px",
+                        fontWeight: 700, fontSize: 14, color: "#374151", textDecoration: "none"
+                      }}>
+                        📋 My Orders
+                      </Link>
+                      <Link href="/favorites" onClick={() => setMobileMenuOpen(false)} style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+                        background: "#fff", border: "1.5px solid #eaeaea", borderRadius: "8px",
+                        fontWeight: 700, fontSize: 14, color: "#374151", textDecoration: "none"
+                      }}>
+                        ♡ My Favourites
+                      </Link>
+                    </>
+                  )}
+
+                  {authUser.role === "VENDOR" && (
+                    <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} style={{
+                      display: "block", background: "#0A0A0A", color: "#fff", textAlign: "center",
+                      padding: "13px", borderRadius: "8px", fontWeight: 700, textDecoration: "none"
+                    }}>
+                      🏪 Vendor Dashboard
+                    </Link>
+                  )}
+
+                  {(authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN") && (
+                    <Link href="/vendors" onClick={() => setMobileMenuOpen(false)} style={{
+                      display: "block", background: "#0A0A0A", color: "#fff", textAlign: "center",
+                      padding: "13px", borderRadius: "8px", fontWeight: 700, textDecoration: "none"
+                    }}>
+                      ⚙️ Admin Panel
+                    </Link>
+                  )}
+
+                  <button
+                    onClick={() => { setMobileMenuOpen(false); handleLogout(); }}
+                    style={{
+                      display: "block", width: "100%", background: "#fee2e2", color: "#dc2626",
+                      textAlign: "center", padding: "13px", borderRadius: "8px",
+                      fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer", fontFamily: "sans-serif"
+                    }}
+                  >
+                    ↩ Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" onClick={() => setMobileMenuOpen(false)} style={{
+                    display: "block", background: RED, color: "#fff", textAlign: "center",
+                    padding: "13px", borderRadius: "8px", fontWeight: 700, textDecoration: "none"
+                  }}>
+                    Sign In / Register
+                  </Link>
+                  <Link href="/services" onClick={() => setMobileMenuOpen(false)} style={{
+                    display: "block", border: `1px solid ${RED}`, color: RED, textAlign: "center",
+                    padding: "12px", borderRadius: "8px", fontWeight: 700, textDecoration: "none"
+                  }}>
+                    Browse All Services
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -349,15 +500,13 @@ function SubNav({ pathname }: { pathname: string }) {
   const isHome     = pathname === "/";
   const isServices = pathname.startsWith("/services");
   const isDeals    = pathname.startsWith("/deals");
-  const isBlog     = pathname.startsWith("/blog");
   const isContact  = pathname.startsWith("/contact");
 
   return (
     <nav className="sub-nav">
-      <Link href="/"        className={isHome     ? "active" : ""}>Home</Link>
+      <Link href="/"         className={isHome     ? "active" : ""}>Home</Link>
       <Link href="/services" className={isServices ? "active" : ""}>Services</Link>
-      <Link href="/deals"    className={isDeals    ? "active" : ""}>Deals</Link>
-      <Link href="/blog"     className={isBlog     ? "active" : ""}>Blog</Link>
+      <Link href="/deals"    className={isDeals    ? "active" : ""}>🔥 Deals</Link>
       <Link href="/contact"  className={isContact  ? "active" : ""}>Contact</Link>
     </nav>
   );

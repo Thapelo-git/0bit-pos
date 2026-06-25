@@ -64,9 +64,22 @@ export default function ServiceDetailPage() {
   const { addItem, isInCart } = useCart();
 
   const [service,    setService]    = useState<any>(null);
-  const [cartAdded,  setCartAdded]  = useState(false);
+  const [bookNowBusy, setBookNowBusy] = useState(false);
   const [isFav,      setIsFav]      = useState(false);
   const [cartToast,  setCartToast]  = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // ── Get Quote state ─────────────────────────────────────────────────────────
+  const [quoteOpen, setQuoteOpen]   = useState(false);
+  const [quoteStep, setQuoteStep]   = useState<"form" | "result">("form");
+  const [qBeds,     setQBeds]       = useState("2");
+  const [qBaths,    setQBaths]      = useState("1");
+  const [qClean,    setQClean]      = useState("Standard Clean");
+  const [qFreq,     setQFreq]       = useState("Once-off");
+  const [qJobSize,  setQJobSize]    = useState("Medium");
+  const [qUrgency,  setQUrgency]    = useState("Within a week");
+  const [qMaterials,setQMaterials]  = useState("Not included");
+  const [quotedPrice, setQuotedPrice] = useState(0);
 
   // Review form state
   const [myRating,  setMyRating]  = useState(0);
@@ -74,16 +87,24 @@ export default function ServiceDetailPage() {
   const [revMsg,    setRevMsg]    = useState<{ text: string; ok: boolean } | null>(null);
   const [revSaving, setRevSaving] = useState(false);
 
+  // Silently check auth (for the "no account" message and fav button)
+  useEffect(() => {
+    fetch(`${API}/auth/me`, { credentials: "include" })
+      .then(r => r.json())
+      .then(j => { if (j.status === "success" && j.data?.user) setIsLoggedIn(true); })
+      .catch(() => {});
+  }, []);
+
+  // Derive cartAdded live from the cart — never stale, never double-counts
+  const cartAdded = service ? isInCart(service.id) : false;
+
   useEffect(() => {
     fetch(`${API}/clients/services/${params.id}`)
       .then(r => r.json())
       .then(j => {
-        if (j.status === "success" && j.data) {
-          setService(j.data);
-          setCartAdded(isInCart(j.data.id));
-        }
+        if (j.status === "success" && j.data) setService(j.data);
       });
-  }, [params.id, isInCart]);
+  }, [params.id]);
 
   // Load favourite state from localStorage (no login required)
   useEffect(() => {
@@ -94,19 +115,37 @@ export default function ServiceDetailPage() {
     } catch {}
   }, [params.id]);
 
-  const handleAddToCart = () => {
+  const addToBooking = () => {
     if (!service) return;
-    addItem({
-      id:         service.id,
-      name:       service.name,
-      price:      Number(service.price),
-      category:   service.category,
-      imageUrl:   service.imageUrl,
-      vendorName: service.vendorProfile?.businessName,
-    });
-    setCartAdded(true);
+    if (!cartAdded) {
+      addItem({
+        id:         service.id,
+        name:       service.name,
+        price:      Number(service.price),
+        category:   service.category,
+        imageUrl:   service.imageUrl,
+        vendorName: service.vendorProfile?.businessName,
+      });
+    }
     setCartToast(true);
     setTimeout(() => setCartToast(false), 2800);
+  };
+
+  const bookNow = () => {
+    if (!service || bookNowBusy) return;
+    setBookNowBusy(true);
+    // Only add if not already in cart — prevents quantity doubling
+    if (!cartAdded) {
+      addItem({
+        id:         service.id,
+        name:       service.name,
+        price:      Number(service.price),
+        category:   service.category,
+        imageUrl:   service.imageUrl,
+        vendorName: service.vendorProfile?.businessName,
+      });
+    }
+    router.push("/checkout");
   };
 
   const toggleFav = () => {
@@ -125,6 +164,44 @@ export default function ServiceDetailPage() {
         setIsFav(true);
       }
     } catch {}
+  };
+
+  const QUOTE_CATS = ["Home Cleaning", "Home Maintenance & Trades"];
+  const isQuotable = service && QUOTE_CATS.includes(service.category);
+
+  const calcQuote = () => {
+    if (!service) return;
+    const base = Number(service.price);
+    let price = base;
+
+    if (service.category === "Home Cleaning") {
+      const bedMult: Record<string, number> = { Studio: 0.8, "1": 1.0, "2": 1.35, "3": 1.7, "4+": 2.2 };
+      const bathAdd: Record<string, number> = { "1": 0, "2": 90, "3+": 180 };
+      const typeMult: Record<string, number> = { "Standard Clean": 1, "Deep Clean": 1.65, "Move In/Out Clean": 2.1 };
+      const freqDisc: Record<string, number> = { "Once-off": 0, "Weekly": 0.15, "Bi-weekly": 0.10, "Monthly": 0.05 };
+      price = (base * (bedMult[qBeds] || 1) * (typeMult[qClean] || 1)) + (bathAdd[qBaths] || 0);
+      price = price * (1 - (freqDisc[qFreq] || 0));
+    } else {
+      // Home Maintenance & Trades
+      const sizeMult: Record<string, number> = { Small: 0.75, Medium: 1.2, Large: 1.9, "Very Large": 2.8 };
+      const urgencyAdd: Record<string, number> = { "Not urgent": 0, "Within a week": 0, "Within 48 hours": 250, Emergency: 500 };
+      const matMult = qMaterials === "Included" ? 1.35 : 1;
+      price = base * (sizeMult[qJobSize] || 1) * matMult + (urgencyAdd[qUrgency] || 0);
+    }
+
+    setQuotedPrice(Math.ceil(price / 10) * 10); // round to nearest R10
+    setQuoteStep("result");
+  };
+
+  const bookWithQuote = () => {
+    if (!service) return;
+    addItem({
+      id: service.id, name: service.name, price: quotedPrice,
+      category: service.category, imageUrl: service.imageUrl,
+      vendorName: service.vendorProfile?.businessName,
+    });
+    setQuoteOpen(false);
+    router.push("/checkout");
   };
 
   const handleReview = async (e: React.FormEvent) => {
@@ -239,6 +316,37 @@ export default function ServiceDetailPage() {
         /* Platform guarantees */
         .guarantees     { border-top:1px solid #eaeaea; margin-top:16px; padding-top:16px; }
         .guarantee-item { display:flex; align-items:center; gap:8px; font-size:12px; color:#374151; margin-bottom:8px; }
+
+        /* ── Get Quote modal ──────────────────────────────────────────── */
+        .qt-overlay     { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:400; display:flex; align-items:flex-end; justify-content:center; }
+        .qt-sheet       { background:#fff; border-radius:20px 20px 0 0; width:100%; max-width:560px; max-height:92vh; overflow-y:auto; padding:0 0 env(safe-area-inset-bottom,16px); }
+        .qt-handle      { width:40px; height:4px; background:#e5e7eb; border-radius:2px; margin:12px auto 0; }
+        .qt-hdr         { display:flex; align-items:center; justify-content:space-between; padding:16px 24px 12px; border-bottom:1px solid #f1f5f9; }
+        .qt-hdr h3      { font-size:17px; font-weight:900; color:#0A0A0A; margin:0; }
+        .qt-close       { background:none; border:none; font-size:20px; cursor:pointer; color:#9ca3af; padding:4px 8px; border-radius:6px; }
+        .qt-close:hover { background:#f1f5f9; color:#374151; }
+        .qt-body        { padding:0 24px 24px; }
+        .qt-label       { font-size:11px; font-weight:800; color:#374151; text-transform:uppercase; letter-spacing:.6px; margin:18px 0 8px; display:block; }
+        .qt-chips       { display:flex; gap:8px; flex-wrap:wrap; }
+        .qt-chip        { padding:8px 14px; border:1.5px solid #e5e7eb; border-radius:20px; background:#fff; font-size:13px; font-weight:600; cursor:pointer; color:#374151; transition:all .15s; }
+        .qt-chip.sel    { border-color:${RED}; background:#fff1f2; color:${RED}; }
+        .qt-chips-v     { display:flex; flex-direction:column; gap:8px; }
+        .qt-chip-v      { padding:10px 16px; border:1.5px solid #e5e7eb; border-radius:10px; background:#fff; font-size:13px; font-weight:600; cursor:pointer; color:#374151; text-align:left; display:flex; justify-content:space-between; align-items:center; }
+        .qt-chip-v.sel  { border-color:${RED}; background:#fff1f2; color:${RED}; }
+        .qt-chip-v .qt-desc { font-size:11px; color:#9ca3af; font-weight:400; }
+        .qt-chip-v.sel .qt-desc { color:#f87171; }
+        .qt-calc-btn    { width:100%; padding:14px; background:#0A0A0A; color:#fff; border:none; border-radius:10px; font-weight:800; font-size:15px; cursor:pointer; margin-top:22px; font-family:sans-serif; }
+        .qt-result      { text-align:center; padding:24px 0 16px; }
+        .qt-result-lbl  { font-size:12px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+        .qt-result-price{ font-size:52px; font-weight:900; color:${RED}; line-height:1; }
+        .qt-result-sub  { font-size:13px; color:#71717A; margin-top:10px; line-height:1.6; }
+        .qt-book-btn    { width:100%; padding:15px; background:${RED}; color:#fff; border:none; border-radius:10px; font-weight:800; font-size:16px; cursor:pointer; margin-top:16px; font-family:sans-serif; }
+        .qt-back        { width:100%; padding:11px; background:none; border:1.5px solid #eaeaea; border-radius:10px; font-weight:700; font-size:14px; cursor:pointer; margin-top:10px; color:#374151; font-family:sans-serif; }
+        .qt-note        { font-size:11px; color:#9ca3af; text-align:center; margin-top:12px; }
+        /* Get Quote button in booking card */
+        .quote-btn      { width:100%; padding:15px; background:#0A0A0A; color:#fff; border:none; border-radius:10px; font-weight:800; font-size:16px; cursor:pointer; transition:opacity .15s; margin-top:16px; font-family:sans-serif; display:flex; align-items:center; justify-content:center; gap:8px; }
+        .quote-btn:hover{ opacity:.88; }
+        .booking-per-quote { font-size:11px; color:#9ca3af; margin:2px 0 20px; padding:6px 10px; background:#f8fafc; border-radius:6px; display:flex; align-items:center; gap:5px; }
 
         @media (max-width:700px) {
           .detail-layout { flex-direction:column; }
@@ -411,8 +519,34 @@ export default function ServiceDetailPage() {
           {/* Right — booking + trust */}
           <div className="detail-right">
             <div className="booking-card">
-              <div className="booking-price">R {Number(service.price).toFixed(2)}</div>
-              <div className="booking-per">Starting price per session</div>
+              {service.isDeal && (
+                <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: "8px", padding: "8px 12px", marginBottom: "14px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>🔥</span>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: "#92400e" }}>Limited Deal</div>
+                    {service.originalPrice && (
+                      <div style={{ fontSize: 12, color: "#b45309" }}>
+                        Save R {(Number(service.originalPrice) - Number(service.price)).toFixed(2)} off normal price
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="booking-price">
+                {isQuotable ? "From " : ""}R {Number(service.price).toFixed(2)}
+                {service.isDeal && service.originalPrice && (
+                  <span style={{ fontSize: 16, fontWeight: 400, color: "#9ca3af", textDecoration: "line-through", marginLeft: 10 }}>
+                    R {Number(service.originalPrice).toFixed(2)}
+                  </span>
+                )}
+              </div>
+              {isQuotable ? (
+                <div className="booking-per-quote">
+                  📐 Price depends on property size — get an instant quote below
+                </div>
+              ) : (
+                <div className="booking-per">Starting price per session</div>
+              )}
 
               {avgRating !== null && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid #f1f5f9" }}>
@@ -433,27 +567,48 @@ export default function ServiceDetailPage() {
                 <span style={{ color: RED }}>R {Number(service.price).toFixed(2)}</span>
               </div>
 
-              {cartAdded ? (
-                <Link href="/cart" className="in-cart-btn">✓ Added — View Cart</Link>
+              {isQuotable ? (
+                <>
+                  <button className="quote-btn" onClick={() => { setQuoteOpen(true); setQuoteStep("form"); }}>
+                    📋 Get My Quote
+                  </button>
+                  {cartAdded ? (
+                    <Link href="/cart" className="in-cart-btn" style={{ marginTop: "10px" }}>✓ Added — View Booking</Link>
+                  ) : (
+                    <button className="add-cart-btn" onClick={addToBooking} style={{ background: RED, opacity: 0.85, marginTop: "10px" }}>
+                      + Add at Base Price
+                    </button>
+                  )}
+                </>
               ) : (
-                <button className="add-cart-btn" onClick={handleAddToCart}>
-                  🛒 Add to Cart
-                </button>
+                <>
+                  <button className="add-cart-btn" onClick={bookNow} style={{ background: "#0A0A0A", marginTop: "16px" }}>
+                    ⚡ Book Now
+                  </button>
+                  {cartAdded ? (
+                    <Link href="/cart" className="in-cart-btn" style={{ marginTop: "10px" }}>✓ Added — View Booking</Link>
+                  ) : (
+                    <button className="add-cart-btn" onClick={addToBooking} style={{ background: RED, opacity: 0.9 }}>
+                      + Add to Booking
+                    </button>
+                  )}
+                </>
               )}
 
               <button className={`fav-toggle${isFav ? " on" : ""}`} onClick={toggleFav}>
                 {isFav ? "♥ Saved to Favourites" : "♡ Save to Favourites"}
               </button>
 
-              <p style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", margin: "10px 0 0" }}>
-                No account needed to add to cart.{" "}
-                <Link href="/login" style={{ color: RED, fontWeight: 700 }}>Sign in</Link> to checkout.
-              </p>
+              {!isLoggedIn && (
+                <p style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", margin: "10px 0 0" }}>
+                  <Link href="/login" style={{ color: RED, fontWeight: 700 }}>Sign in</Link> to save your booking history and track orders.
+                </p>
+              )}
 
               {cartToast && (
                 <div className="cart-toast">
-                  🛒 Added to cart!
-                  <Link href="/cart" style={{ color: "#f59e0b", fontWeight: 800, textDecoration: "none", fontSize: 13 }}>View Cart →</Link>
+                  ✓ Added to booking!
+                  <Link href="/cart" style={{ color: "#f59e0b", fontWeight: 800, textDecoration: "none", fontSize: 13 }}>View Booking →</Link>
                 </div>
               )}
 
@@ -496,6 +651,156 @@ export default function ServiceDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Get Quote modal ──────────────────────────────────────────────── */}
+      {quoteOpen && (
+        <div className="qt-overlay" onClick={() => setQuoteOpen(false)}>
+          <div className="qt-sheet" onClick={e => e.stopPropagation()}>
+            <div className="qt-handle" />
+
+            <div className="qt-hdr">
+              <h3>
+                {service?.category === "Home Cleaning" ? "🧹 Get a Cleaning Quote" : "🔧 Get a Trade Quote"}
+              </h3>
+              <button className="qt-close" onClick={() => setQuoteOpen(false)}>✕</button>
+            </div>
+
+            <div className="qt-body">
+              {quoteStep === "form" ? (
+                <>
+                  {service?.category === "Home Cleaning" ? (
+                    <>
+                      {/* Bedrooms */}
+                      <span className="qt-label">Property size</span>
+                      <div className="qt-chips">
+                        {["Studio", "1", "2", "3", "4+"].map(v => (
+                          <button key={v} className={"qt-chip" + (qBeds === v ? " sel" : "")} onClick={() => setQBeds(v)}>
+                            {v === "Studio" ? "Studio" : `${v} Bed`}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Bathrooms */}
+                      <span className="qt-label">Bathrooms</span>
+                      <div className="qt-chips">
+                        {["1", "2", "3+"].map(v => (
+                          <button key={v} className={"qt-chip" + (qBaths === v ? " sel" : "")} onClick={() => setQBaths(v)}>
+                            {v} Bath{v !== "1" ? "s" : ""}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Clean type */}
+                      <span className="qt-label">Type of clean</span>
+                      <div className="qt-chips-v">
+                        {[
+                          { v: "Standard Clean",    d: "Regular dust, sweep & mop" },
+                          { v: "Deep Clean",        d: "Full scrub, inside appliances, windows" },
+                          { v: "Move In/Out Clean", d: "Thorough end-of-lease or new-home clean" },
+                        ].map(({ v, d }) => (
+                          <button key={v} className={"qt-chip-v" + (qClean === v ? " sel" : "")} onClick={() => setQClean(v)}>
+                            <span>{v}</span>
+                            <span className="qt-desc">{d}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Frequency */}
+                      <span className="qt-label">How often?</span>
+                      <div className="qt-chips">
+                        {[
+                          { v: "Once-off", discount: "" },
+                          { v: "Monthly",   discount: "5% off" },
+                          { v: "Bi-weekly", discount: "10% off" },
+                          { v: "Weekly",    discount: "15% off" },
+                        ].map(({ v, discount }) => (
+                          <button key={v} className={"qt-chip" + (qFreq === v ? " sel" : "")} onClick={() => setQFreq(v)}>
+                            {v}{discount ? ` · ${discount}` : ""}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Job size */}
+                      <span className="qt-label">Job size</span>
+                      <div className="qt-chips-v">
+                        {[
+                          { v: "Small",      d: "Quick fix, under 2 hours" },
+                          { v: "Medium",     d: "Half day, moderate complexity" },
+                          { v: "Large",      d: "Full day, skilled work required" },
+                          { v: "Very Large", d: "Multi-day or complex project" },
+                        ].map(({ v, d }) => (
+                          <button key={v} className={"qt-chip-v" + (qJobSize === v ? " sel" : "")} onClick={() => setQJobSize(v)}>
+                            <span>{v}</span>
+                            <span className="qt-desc">{d}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Urgency */}
+                      <span className="qt-label">How urgent?</span>
+                      <div className="qt-chips">
+                        {[
+                          { v: "Not urgent",      extra: "" },
+                          { v: "Within a week",   extra: "" },
+                          { v: "Within 48 hours", extra: "+R250" },
+                          { v: "Emergency",       extra: "+R500" },
+                        ].map(({ v, extra }) => (
+                          <button key={v} className={"qt-chip" + (qUrgency === v ? " sel" : "")} onClick={() => setQUrgency(v)}>
+                            {v}{extra ? ` · ${extra}` : ""}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Materials */}
+                      <span className="qt-label">Materials</span>
+                      <div className="qt-chips">
+                        {[
+                          { v: "Not included", d: "You supply materials" },
+                          { v: "Included",     d: "Provider supplies (+35%)" },
+                        ].map(({ v, d }) => (
+                          <button key={v} className={"qt-chip" + (qMaterials === v ? " sel" : "")} onClick={() => setQMaterials(v)}>
+                            {v} <span style={{ fontSize: 11, color: "inherit", opacity: .7 }}>· {d}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <button className="qt-calc-btn" onClick={calcQuote}>
+                    Calculate My Price →
+                  </button>
+                  <p className="qt-note">Instant estimate — confirm exact price with the provider</p>
+                </>
+              ) : (
+                /* ── Result step ── */
+                <>
+                  <div className="qt-result">
+                    <div className="qt-result-lbl">Your estimated price</div>
+                    <div className="qt-result-price">R {quotedPrice.toFixed(2)}</div>
+                    <div className="qt-result-sub">
+                      {service?.category === "Home Cleaning"
+                        ? `${qBeds === "Studio" ? "Studio" : qBeds + " Bed"} · ${qBaths} Bath · ${qClean} · ${qFreq}`
+                        : `${qJobSize} job · ${qUrgency} · Materials ${qMaterials}`}
+                      <br />
+                      <span style={{ fontSize: 11 }}>Final price confirmed at time of booking</span>
+                    </div>
+                  </div>
+
+                  <button className="qt-book-btn" onClick={bookWithQuote}>
+                    ⚡ Book Now — R {quotedPrice.toFixed(2)}
+                  </button>
+                  <button className="qt-back" onClick={() => setQuoteStep("form")}>
+                    ← Change details
+                  </button>
+                  <p className="qt-note">Adding to booking at quoted price. Provider will confirm on contact.</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -32,9 +32,9 @@ export default function CartPage() {
           .empty-btn  { background:${RED}; color:#fff; padding:14px 32px; border-radius:8px; font-weight:800; font-size:15px; text-decoration:none; }
         `}</style>
         <div className="empty-cart">
-          <div className="empty-icon">🛒</div>
-          <h1 className="empty-title">Your cart is empty</h1>
-          <p className="empty-sub">Browse our services and add something to your cart — no account needed to get started.</p>
+          <div className="empty-icon">📋</div>
+          <h1 className="empty-title">Your booking is empty</h1>
+          <p className="empty-sub">Browse our services and add them to your booking — no account needed to get started.</p>
           <Link href="/services" className="empty-btn">Browse Services</Link>
         </div>
       </>
@@ -92,10 +92,10 @@ export default function CartPage() {
       `}</style>
 
       <div className="cart-wrap">
-        <h1 className="cart-title">Shopping Cart</h1>
-        <p className="cart-sub">{items.length} service{items.length !== 1 ? "s" : ""} in your cart — no account needed to browse</p>
+        <h1 className="cart-title">My Booking</h1>
+        <p className="cart-sub">{items.length} service{items.length !== 1 ? "s" : ""} in your booking</p>
 
-        <button className="clear-btn" onClick={clearCart}>✕ Clear all items</button>
+        <button className="clear-btn" onClick={clearCart}>✕ Clear all</button>
 
         <div className="cart-layout">
           {/* Items */}
@@ -163,7 +163,7 @@ export default function CartPage() {
               <button className="checkout-btn" onClick={() => router.push("/checkout")}>
                 Proceed to Checkout →
               </button>
-              <Link href="/services" className="continue-link">← Continue Shopping</Link>
+              <Link href="/services" className="continue-link">← Add More Services</Link>
             </div>
 
             {/* Trust strip */}

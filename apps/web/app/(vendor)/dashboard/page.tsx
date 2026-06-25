@@ -27,7 +27,7 @@ const CATEGORIES = [
   "Other Local Services",
 ];
 
-type Tab = "overview" | "services";
+type Tab = "overview" | "services" | "profile";
 
 export default function VendorDashboard() {
   const [tab,      setTab]      = useState<Tab>("overview");
@@ -35,12 +35,38 @@ export default function VendorDashboard() {
   const [services, setServices] = useState<any[]>([]);
   const [svcLoading, setSvcLoading] = useState(false);
 
+  // Per-booking action loading (accept/reject/complete)
+  const [bookingBusy, setBookingBusy] = useState<Record<string, boolean>>({});
+
+  // Delete service
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Business profile edit
+  const [profile,      setProfile]      = useState<any>(null);
+  const [profileForm,  setProfileForm]  = useState({ businessName: "", phone: "", locationText: "", bankDetails: "", description: "" });
+  const [profileMsg,   setProfileMsg]   = useState<{ text: string; ok: boolean } | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+
   // Create service form
   const [showForm,   setShowForm]   = useState(false);
-  const [form,       setForm]       = useState({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "" });
+  const [form,       setForm]       = useState({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "" });
   const [imageMode,  setImageMode]  = useState<"file" | "url">("file");
   const [formMsg,    setFormMsg]    = useState<{ text: string; ok: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [aiDescBusy, setAiDescBusy] = useState(false);
+
+  const generateDescription = async () => {
+    if (!form.name.trim() || !form.category) return;
+    setAiDescBusy(true);
+    try {
+      const res  = await fetch(`${API}/ai/describe`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.name.trim(), category: form.category, price: form.price ? parseFloat(form.price) : undefined }) });
+      const json = await res.json();
+      if (json.status === "success" && json.data?.description) {
+        setForm(p => ({ ...p, description: json.data.description }));
+      }
+    } catch { /* swallow */ }
+    finally { setAiDescBusy(false); }
+  };
 
   const handleLocalImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -54,13 +80,36 @@ export default function VendorDashboard() {
     reader.readAsDataURL(file);
   };
 
+  const [dashRefresh, setDashRefresh] = useState(0);
+
   // Load dashboard data
   useEffect(() => {
     fetch(`${API}/vendors/dashboard`, { credentials: "include" })
       .then(r => r.json())
       .then(j => { if (j.status === "success") setData(j.data); })
       .catch(() => {});
-  }, []);
+  }, [dashRefresh]);
+
+  // Load profile when tab activates
+  useEffect(() => {
+    if (tab !== "profile" || profile) return;
+    fetch(`${API}/vendors/profile`, { credentials: "include" })
+      .then(r => r.json())
+      .then(j => {
+        if (j.status === "success") {
+          const p = j.data.profile || {};
+          setProfile(p);
+          setProfileForm({
+            businessName: p.businessName || "",
+            phone:        p.phone        || "",
+            locationText: p.locationText || "",
+            bankDetails:  p.bankDetails  || "",
+            description:  p.description  || "",
+          });
+        }
+      })
+      .catch(() => {});
+  }, [tab, profile]);
 
   const [svcRefresh, setSvcRefresh] = useState(0);
 
@@ -75,6 +124,67 @@ export default function VendorDashboard() {
       .finally(() => setSvcLoading(false));
   }, [tab, svcRefresh]);
 
+  // Accept / Reject / Complete a booking
+  const handleBookingAction = async (id: string, action: "accept" | "reject" | "complete") => {
+    setBookingBusy(p => ({ ...p, [id]: true }));
+    try {
+      const res  = await fetch(`${API}/vendors/bookings/${id}/${action}`, { method: "PATCH", credentials: "include" });
+      const json = await res.json();
+      if (json.status === "success") {
+        setData((prev: any) => ({
+          ...prev,
+          transactions: prev.transactions.map((t: any) =>
+            t.id === id ? { ...t, status: json.data.status } : t
+          ),
+        }));
+      }
+    } catch {}
+    setBookingBusy(p => ({ ...p, [id]: false }));
+  };
+
+  // Delete a service
+  const handleDeleteService = async (id: string, name: string) => {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    setDeletingId(id);
+    try {
+      const res  = await fetch(`${API}/vendors/services/${id}`, { method: "DELETE", credentials: "include" });
+      const json = await res.json();
+      if (json.status === "success") {
+        setServices(prev => prev.filter(s => s.id !== id));
+      } else {
+        alert(json.message || "Could not delete service.");
+      }
+    } catch {
+      alert("Network error. Please try again.");
+    }
+    setDeletingId(null);
+  };
+
+  // Save business profile
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileSaving(true);
+    setProfileMsg(null);
+    try {
+      const res  = await fetch(`${API}/vendors/profile`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(profileForm),
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (json.status === "success") {
+        setProfileMsg({ text: "Business details updated successfully!", ok: true });
+        setProfile(json.data.profile);
+      } else {
+        setProfileMsg({ text: json.message || "Update failed.", ok: false });
+      }
+    } catch {
+      setProfileMsg({ text: "Network error. Please try again.", ok: false });
+    }
+    setProfileSaving(false);
+  };
+
   const handleCreateService = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -83,14 +193,20 @@ export default function VendorDashboard() {
       const res = await fetch(`${API}/vendors/services`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, price: parseFloat(form.price), imageUrl: form.imageUrl || undefined }),
+        body: JSON.stringify({
+          ...form,
+          price:         parseFloat(form.price),
+          imageUrl:      form.imageUrl || undefined,
+          isDeal:        form.isDeal,
+          originalPrice: form.isDeal && form.originalPrice ? parseFloat(form.originalPrice) : undefined,
+        }),
         credentials: "include",
       });
       const json = await res.json();
       if (json.status === "success") {
         setFormMsg({ text: "Service created successfully!", ok: true });
         setServices(prev => [json.data, ...prev]);
-        setForm({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "" });
+        setForm({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "" });
         setTimeout(() => { setShowForm(false); setFormMsg(null); }, 1500);
       } else {
         setFormMsg({ text: json.message || "Failed to create service.", ok: false });
@@ -143,11 +259,29 @@ export default function VendorDashboard() {
         .tx-table        { width:100%; border-collapse:collapse; font-size:13px; }
         .tx-table th     { padding:12px 10px; color:#71717A; font-weight:600; text-align:left; border-bottom:2px solid #f0f0f0; }
         .tx-table td     { padding:14px 10px; border-bottom:1px solid #f8f8f8; }
-        .status-badge    { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; display:inline-block; }
+        .status-badge    { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; display:inline-block; white-space:nowrap; }
         .status-COMPLETED { background:#d1fae5; color:#065f46; }
         .status-PENDING   { background:#fef3c7; color:#92400e; }
         .status-ACCEPTED  { background:#dbeafe; color:#1e40af; }
         .status-REJECTED  { background:#fee2e2; color:#991b1b; }
+        .status-CANCELLED { background:#f3f4f6; color:#6b7280; }
+
+        .pay-badge       { padding:3px 9px; border-radius:10px; font-size:11px; font-weight:700; background:#f8fafc; color:#374151; white-space:nowrap; }
+        .action-btn      { padding:5px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; border:none; font-family:sans-serif; transition:opacity .15s; }
+        .action-btn:disabled { opacity:.5; cursor:not-allowed; }
+        .btn-accept      { background:#dbeafe; color:#1e40af; }
+        .btn-accept:hover:not(:disabled) { background:#bfdbfe; }
+        .btn-reject      { background:#fee2e2; color:#991b1b; }
+        .btn-reject:hover:not(:disabled) { background:#fecaca; }
+        .btn-complete    { background:#d1fae5; color:#065f46; }
+        .btn-complete:hover:not(:disabled) { background:#a7f3d0; }
+        .btn-delete      { background:#fee2e2; color:#991b1b; border:none; padding:7px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; font-family:sans-serif; }
+        .btn-delete:hover { background:#fecaca; }
+        .btn-delete:disabled { opacity:.5; cursor:not-allowed; }
+
+        .profile-form    { background:#fff; border:1.5px solid #eaeaea; border-radius:14px; padding:28px; max-width:540px; }
+        .profile-section { font-size:12px; font-weight:700; color:${RED}; text-transform:uppercase; letter-spacing:.5px; margin:0 0 16px; }
+        .bank-note       { font-size:12px; color:#71717A; background:#f8fafc; border:1px solid #e5e7eb; border-radius:6px; padding:10px 14px; margin-bottom:16px; }
 
         .pending-box     { background:#fef3c7; border:1px solid #fde68a; border-radius:12px; padding:32px; text-align:center; }
         .pending-box h2  { color:#92400e; margin:0 0 10px; }
@@ -168,10 +302,14 @@ export default function VendorDashboard() {
         @media (max-width:640px) {
           .vd            { padding:16px; }
           .vd-header     { flex-direction:column; }
+          /* On mobile keep: Client, Service, Amount, Status, Actions — hide Phone, Payment, Date */
           .tx-table th:nth-child(3),
           .tx-table td:nth-child(3),
-          .tx-table th:nth-child(5),
-          .tx-table td:nth-child(5) { display:none; }
+          .tx-table th:nth-child(4),
+          .tx-table td:nth-child(4),
+          .tx-table th:nth-child(8),
+          .tx-table td:nth-child(8) { display:none; }
+          .vd-stats { grid-template-columns:1fr 1fr; }
         }
       `}</style>
 
@@ -206,12 +344,9 @@ export default function VendorDashboard() {
           <>
             {/* Tabs */}
             <div className="vd-tabs">
-              <button className={`vd-tab${tab === "overview" ? " active" : ""}`} onClick={() => setTab("overview")}>
-                Overview
-              </button>
-              <button className={`vd-tab${tab === "services" ? " active" : ""}`} onClick={() => setTab("services")}>
-                My Services
-              </button>
+              <button className={`vd-tab${tab === "overview"  ? " active" : ""}`} onClick={() => setTab("overview")}>Overview</button>
+              <button className={`vd-tab${tab === "services"  ? " active" : ""}`} onClick={() => setTab("services")}>My Services</button>
+              <button className={`vd-tab${tab === "profile"   ? " active" : ""}`} onClick={() => setTab("profile")}>Business Profile</button>
             </div>
 
             {/* ── OVERVIEW TAB ─────────────────────────────────────────── */}
@@ -220,23 +355,33 @@ export default function VendorDashboard() {
                 {/* Stats */}
                 <div className="vd-stats">
                   <div className="stat-card hi">
-                    <div className="stat-label">Total Revenue</div>
+                    <div className="stat-label">Earned Revenue</div>
                     <div className="stat-value">R {(data?.totalRevenue || 0).toFixed(2)}</div>
+                  </div>
+                  <div className="stat-card" style={{ borderColor: "#bfdbfe" }}>
+                    <div className="stat-label">Accepted (in progress)</div>
+                    <div className="stat-value" style={{ color: "#1e40af" }}>R {(data?.acceptedRevenue || 0).toFixed(2)}</div>
                   </div>
                   <div className="stat-card">
                     <div className="stat-label">Total Bookings</div>
                     <div className="stat-value">{data?.numberOfDeals || 0}</div>
                   </div>
                   <div className="stat-card">
-                    <div className="stat-label">Completed</div>
-                    <div className="stat-value">{data?.fulfilledDeals || 0}</div>
+                    <div className="stat-label">Pending / Completed</div>
+                    <div className="stat-value">{data?.pendingCount || 0} / {data?.fulfilledDeals || 0}</div>
                   </div>
                 </div>
 
                 {/* Transactions */}
                 <div>
                   <div className="vd-section-hdr">
-                    <h3 className="vd-section-title">Recent Transactions</h3>
+                    <h3 className="vd-section-title">Bookings</h3>
+                    <button
+                      onClick={() => setDashRefresh(n => n + 1)}
+                      style={{ background: "none", border: "1.5px solid #eaeaea", borderRadius: "6px", padding: "7px 14px", fontWeight: 700, fontSize: "13px", cursor: "pointer", color: "#374151" }}
+                    >
+                      ↻ Refresh
+                    </button>
                   </div>
                   <div style={{ background: "#fff", borderRadius: "12px", border: "1.5px solid #eaeaea", overflowX: "auto" }}>
                     <table className="tx-table">
@@ -245,8 +390,10 @@ export default function VendorDashboard() {
                           <th>Client</th>
                           <th>Service</th>
                           <th>Phone</th>
+                          <th>Payment</th>
                           <th>Amount</th>
                           <th>Status</th>
+                          <th>Actions</th>
                           <th>Date</th>
                         </tr>
                       </thead>
@@ -254,20 +401,45 @@ export default function VendorDashboard() {
                         {data?.transactions?.length ? data.transactions.map((t: any) => (
                           <tr key={t.id}>
                             <td style={{ fontWeight: 600 }}>{t.name}</td>
-                            <td style={{ color: "#71717A" }}>{t.deal}</td>
-                            <td style={{ color: "#71717A" }}>{t.phoneNumber || "—"}</td>
-                            <td style={{ fontWeight: 700, color: RED }}>R {Number(t.amount).toFixed(2)}</td>
+                            <td style={{ color: "#71717A", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.deal}</td>
+                            <td style={{ color: "#71717A", whiteSpace: "nowrap" }}>{t.phoneNumber || "—"}</td>
+                            <td>
+                              <span className="pay-badge">
+                                {t.paymentMethod === "CARD" ? "💳 Card" : t.paymentMethod === "EFT" ? "🏦 EFT" : t.paymentMethod === "CASH" ? "💵 Cash" : t.paymentMethod || "—"}
+                              </span>
+                            </td>
+                            <td style={{ fontWeight: 700, color: RED, whiteSpace: "nowrap" }}>R {Number(t.amount).toFixed(2)}</td>
                             <td>
                               <span className={`status-badge status-${t.status || "PENDING"}`}>
                                 {t.status || "PENDING"}
                               </span>
                             </td>
-                            <td style={{ color: "#71717A" }}>{new Date(t.date).toLocaleDateString("en-ZA")}</td>
+                            <td style={{ whiteSpace: "nowrap" }}>
+                              {t.status === "PENDING" && (
+                                <div style={{ display: "flex", gap: 4 }}>
+                                  <button className="action-btn btn-accept"   disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "accept")}>
+                                    {bookingBusy[t.id] ? "…" : "✓ Accept"}
+                                  </button>
+                                  <button className="action-btn btn-reject"   disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "reject")}>
+                                    {bookingBusy[t.id] ? "…" : "✕ Reject"}
+                                  </button>
+                                </div>
+                              )}
+                              {t.status === "ACCEPTED" && (
+                                <button className="action-btn btn-complete" disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "complete")}>
+                                  {bookingBusy[t.id] ? "…" : "✓ Mark Done"}
+                                </button>
+                              )}
+                              {(t.status === "COMPLETED" || t.status === "REJECTED" || t.status === "CANCELLED") && (
+                                <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
+                              )}
+                            </td>
+                            <td style={{ color: "#71717A", whiteSpace: "nowrap" }}>{new Date(t.date).toLocaleDateString("en-ZA")}</td>
                           </tr>
                         )) : (
                           <tr>
-                            <td colSpan={6} style={{ textAlign: "center", padding: "40px", color: "#71717A" }}>
-                              No transactions yet. Add services to start receiving bookings.
+                            <td colSpan={8} style={{ textAlign: "center", padding: "40px", color: "#71717A" }}>
+                              No bookings yet. Add services to start receiving bookings.
                             </td>
                           </tr>
                         )}
@@ -330,10 +502,17 @@ export default function VendorDashboard() {
                             <Link href={`/services/${svc.id}`} style={{
                               padding: "9px 12px", background: "#f8f8f8", border: "1px solid #eaeaea",
                               borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#333",
-                              textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4,
+                              textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, flex: 1, justifyContent: "center",
                             }}>
                               👁 Preview
                             </Link>
+                            <button
+                              className="btn-delete"
+                              disabled={deletingId === svc.id}
+                              onClick={() => handleDeleteService(svc.id, svc.name)}
+                            >
+                              {deletingId === svc.id ? "…" : "🗑"}
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -341,6 +520,58 @@ export default function VendorDashboard() {
                   </div>
                 )}
               </>
+            )}
+
+            {/* ── BUSINESS PROFILE TAB ──────────────────────────────────── */}
+            {tab === "profile" && (
+              <div className="profile-form">
+                <p className="profile-section">Business Details</p>
+                <form onSubmit={handleSaveProfile}>
+                  <div className="form-group">
+                    <label className="form-label">Business Name</label>
+                    <input className="form-input" type="text" value={profileForm.businessName}
+                      onChange={e => setProfileForm(p => ({ ...p, businessName: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Business Phone</label>
+                    <input className="form-input" type="tel" placeholder="011 234 5678" value={profileForm.phone}
+                      onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Location (Town / City)</label>
+                    <input className="form-input" type="text" placeholder="Soweto, Johannesburg" value={profileForm.locationText}
+                      onChange={e => setProfileForm(p => ({ ...p, locationText: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Business Description</label>
+                    <textarea className="form-textarea" rows={3} placeholder="Describe your business and the services you offer…" value={profileForm.description}
+                      onChange={e => setProfileForm(p => ({ ...p, description: e.target.value }))} />
+                  </div>
+
+                  <p className="profile-section" style={{ marginTop: 24 }}>Banking Details</p>
+                  <div className="bank-note">
+                    💡 Your banking details are only used by kasiFix admin for payouts. They are never shared with customers.
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Bank Account Details</label>
+                    <textarea className="form-textarea" rows={3}
+                      placeholder={"Bank: FNB\nAccount No: 62XXXXXXXXX\nBranch Code: 250655\nAccount Type: Cheque"}
+                      value={profileForm.bankDetails}
+                      onChange={e => setProfileForm(p => ({ ...p, bankDetails: e.target.value }))} />
+                  </div>
+
+                  {profileMsg && (
+                    <div style={{ padding: "12px 14px", borderRadius: "8px", marginBottom: "14px", fontWeight: 600, fontSize: "13px",
+                      background: profileMsg.ok ? "#d1fae5" : "#fee2e2", color: profileMsg.ok ? "#065f46" : "#991b1b" }}>
+                      {profileMsg.text}
+                    </div>
+                  )}
+
+                  <button type="submit" className="btn-primary" disabled={profileSaving} style={{ width: "100%", padding: "13px" }}>
+                    {profileSaving ? "Saving…" : "Save Business Details"}
+                  </button>
+                </form>
+              </div>
             )}
           </>
         )}
@@ -390,10 +621,21 @@ export default function VendorDashboard() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Description *</label>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <label className="form-label" style={{ margin: 0 }}>Description *</label>
+                  <button
+                    type="button"
+                    onClick={generateDescription}
+                    disabled={aiDescBusy || !form.name.trim()}
+                    style={{ background: aiDescBusy ? "#e5e7eb" : "#f59e0b", color: aiDescBusy ? "#9ca3af" : "#0A0A0A", border: "none", borderRadius: "6px", padding: "5px 12px", fontSize: "12px", fontWeight: 800, cursor: aiDescBusy || !form.name.trim() ? "not-allowed" : "pointer", fontFamily: "sans-serif", display: "flex", alignItems: "center", gap: 5 }}
+                    title={!form.name.trim() ? "Enter a service name first" : "Generate a professional description with AI"}
+                  >
+                    {aiDescBusy ? "✦ Writing…" : "✨ AI Write"}
+                  </button>
+                </div>
                 <textarea
                   className="form-textarea"
-                  placeholder="Describe what this service includes, what clients can expect, and any requirements..."
+                  placeholder="Describe what this service includes, what clients can expect, and any requirements…  or click ✨ AI Write to generate one"
                   value={form.description}
                   onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                   required
@@ -502,6 +744,40 @@ export default function VendorDashboard() {
                   <p style={{ fontSize: "12px", color: "#9ca3af", margin: "6px 0 0" }}>
                     If left blank, a default category image will be used.
                   </p>
+                )}
+              </div>
+
+              {/* Deal toggle */}
+              <div className="form-group" style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "10px", padding: "14px 16px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.isDeal}
+                    onChange={e => setForm(p => ({ ...p, isDeal: e.target.checked, originalPrice: e.target.checked ? p.originalPrice : "" }))}
+                    style={{ width: 18, height: 18, accentColor: "#f59e0b", cursor: "pointer" }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>🔥 Mark as Deal</div>
+                    <div style={{ fontSize: 11, color: "#b45309", marginTop: 2 }}>This service will appear on the Deals page with a discount badge</div>
+                  </div>
+                </label>
+                {form.isDeal && (
+                  <div style={{ marginTop: 12 }}>
+                    <label className="form-label" style={{ color: "#92400e" }}>Original Price (R) — before discount</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g. 850"
+                      value={form.originalPrice}
+                      onChange={e => setForm(p => ({ ...p, originalPrice: e.target.value }))}
+                      style={{ borderColor: "#fde68a" }}
+                    />
+                    {form.originalPrice && form.price && parseFloat(form.originalPrice) <= parseFloat(form.price) && (
+                      <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>Original price must be higher than the deal price.</p>
+                    )}
+                  </div>
                 )}
               </div>
 

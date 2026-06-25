@@ -94,8 +94,8 @@ function LandingPage() {
 
   useEffect(() => {
     const url = cat
-      ? `${API}/clients/services/search?category=${encodeURIComponent(cat)}`
-      : `${API}/clients/services/search`;
+      ? `${API}/clients/services/search?deals=true&category=${encodeURIComponent(cat)}`
+      : `${API}/clients/services/search?deals=true`;
     fetch(url)
       .then(r => r.json())
       .then(j => { if (j.status === "success" && j.data) setDeals(j.data.slice(0, 3)); })
@@ -209,15 +209,15 @@ function LandingPage() {
 
       {/* ── TRENDING DEALS ────────────────────────────────────────────────── */}
       <div className="section-header">
-        <h3 className="section-title">Trending Deals</h3>
-        <Link href="/services" className="view-all-link">View All →</Link>
+        <h3 className="section-title">🔥 Trending Deals</h3>
+        <Link href="/deals" className="view-all-link">View All Deals →</Link>
       </div>
       <div className="deals-grid">
         {deals.length > 0 ? deals.map((deal, i) => (
           <TrendingCard key={deal.id} deal={deal} index={i} />
         )) : (
           <p style={{ color: "#71717A", gridColumn: "1/-1", padding: "12px 0" }}>
-            No deals found for this category. Try another!
+            No active deals right now — check back soon!
           </p>
         )}
       </div>

@@ -29,9 +29,10 @@ function LoginContent() {
   const [phone,         setPhone]         = useState("");
   const [locationText,  setLocationText]  = useState("");
 
-  const [error,   setError]   = useState("");
-  const [success, setSuccess] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error,    setError]    = useState("");
+  const [success,  setSuccess]  = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [showPass, setShowPass] = useState(false);
 
   const handleSubmit = async () => {
     setError("");
@@ -118,6 +119,10 @@ function LoginContent() {
         .auth-switch   { text-align:center; margin-top:20px; font-size:14px; color:#71717A; }
         .auth-switch span { color:${RED}; cursor:pointer; font-weight:700; }
         .auth-switch span:hover { text-decoration:underline; }
+        .pass-wrap     { position:relative; }
+        .pass-wrap .field-input { padding-right:52px; }
+        .pass-eye      { position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:#9ca3af; font-size:14px; font-weight:600; padding:4px 6px; border-radius:4px; line-height:1; }
+        .pass-eye:hover { color:#374151; }
 
         @media (max-width:480px) {
           .auth-card  { border-radius:0; max-width:100%; }
@@ -212,13 +217,18 @@ function LoginContent() {
               </div>
               <div>
                 <label className="field-label">Password</label>
-                <input
-                  className="field-input"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                />
+                <div className="pass-wrap">
+                  <input
+                    className="field-input"
+                    type={showPass ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                  />
+                  <button type="button" className="pass-eye" onClick={() => setShowPass(v => !v)} tabIndex={-1}>
+                    {showPass ? "Hide" : "Show"}
+                  </button>
+                </div>
               </div>
 
               {isLogin && (

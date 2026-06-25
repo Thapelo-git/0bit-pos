@@ -28,11 +28,12 @@ export const createBooking = catchAsync(async (req: Request, res: Response) => {
 export const checkout = catchAsync(async (req: Request, res: Response) => {
   if (!req.user) throw new AppError("Sign in to place an order", HttpStatus.UNAUTHORIZED);
 
-  const { items, address, paymentMethod, notes } = req.body as {
+  const { items, address, paymentMethod, notes, phone } = req.body as {
     items:         { serviceId: string }[];
     address:       string;
     paymentMethod: string;
     notes?:        string;
+    phone?:        string;
   };
 
   if (!items?.length)    throw new AppError("Cart is empty",             HttpStatus.BAD_REQUEST);
@@ -71,6 +72,14 @@ export const checkout = catchAsync(async (req: Request, res: Response) => {
   );
 
   const total = bookings.reduce((s, b) => s + b.totalAmount, 0);
+
+  // Save client phone to their profile so vendors can contact them
+  if (phone?.trim()) {
+    await prisma.user.update({
+      where: { id: req.user!.userId },
+      data:  { phone: phone.trim() },
+    }).catch(() => {});
+  }
 
   return res.status(HttpStatus.CREATED).json({
     status:  "success",

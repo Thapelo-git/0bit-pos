@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 process.on("unhandledRejection", (reason: unknown) => {
   console.error("🔴 [UnhandledRejection]", reason);
 });
@@ -26,6 +28,7 @@ import notificationRoutes from "./modules/notifications/notification.routes.js";
 import vendorRoutes       from "./modules/vendors/vendors.routes.js";
 import clientRoutes       from "./modules/clients/clients.routes.js";
 import bookingRoutes      from "./modules/bookings/bookings.routes.js";
+import aiRoutes           from "./modules/ai/ai.routes.js";
 
 const app: Express = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -61,8 +64,8 @@ app.use(
 );
 
 // ── 3. PARSERS ────────────────────────────────────────────────────────────────
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // ── 4. CROSS-CUTTING MIDDLEWARE ───────────────────────────────────────────────
@@ -81,6 +84,7 @@ app.use(`${API}/notifications`, notificationRoutes);
 app.use(`${API}/vendors`,       vendorRoutes);
 app.use(`${API}/clients`,       clientRoutes);
 app.use(`${API}/bookings`,      bookingRoutes);
+app.use(`${API}/ai`,            aiRoutes);
 
 // ── 6. 404 ────────────────────────────────────────────────────────────────────
 app.use((req: Request, res: Response) => {

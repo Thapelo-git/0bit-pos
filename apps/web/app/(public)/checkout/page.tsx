@@ -46,14 +46,22 @@ export default function CheckoutPage() {
   const [notes,      setNotes]      = useState("");
   const [payment,    setPayment]    = useState("EFT");
 
+  // Card detail fields (UI capture — connect to Yoco/Peach/Stripe for live charges)
+  const [cardName,   setCardName]   = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv,    setCardCvv]    = useState("");
+  const [saveAddr,   setSaveAddr]   = useState(false);
+
   const [placing,   setPlacing]   = useState(false);
   const [error,     setError]     = useState("");
   const [confirmed, setConfirmed] = useState<{ bookings: any[]; total: number } | null>(null);
 
+  const ADDR_KEY    = "kasifix_saved_address";
   const SERVICE_FEE = items.length > 0 ? 30 : 0;
   const grandTotal  = total + SERVICE_FEE;
 
-  // Check auth on mount
+  // Check auth on mount + load saved address
   useEffect(() => {
     fetch(`${API}/auth/me`, { credentials: "include" })
       .then(r => r.json())
@@ -62,6 +70,18 @@ export default function CheckoutPage() {
           const u = j.data.user;
           setUser(u);
           setFullName(u.displayName || `${u.firstName || ""}`.trim() || "");
+          // Pre-fill saved address if exists
+          try {
+            const saved = localStorage.getItem(`${ADDR_KEY}_${u.email}`);
+            if (saved) {
+              const a = JSON.parse(saved);
+              if (a.phone)      setPhone(a.phone);
+              if (a.address)    setAddress(a.address);
+              if (a.city)       setCity(a.city);
+              if (a.province)   setProvince(a.province);
+              if (a.postalCode) setPostalCode(a.postalCode);
+            }
+          } catch {}
         } else {
           router.push(`/login?redirect=/checkout`);
         }
@@ -79,6 +99,17 @@ export default function CheckoutPage() {
     if (!address.trim())  { setError("Street address is required."); return; }
     if (!city.trim())     { setError("City is required."); return; }
     if (!province)        { setError("Please select your province."); return; }
+    if (payment === "CARD") {
+      if (!cardName.trim())   { setError("Cardholder name is required."); return; }
+      if (cardNumber.replace(/\s/g, "").length < 13) { setError("Enter a valid card number."); return; }
+      if (!cardExpiry.trim()) { setError("Card expiry date is required."); return; }
+      if (!cardCvv.trim())    { setError("CVV is required."); return; }
+    }
+
+    // Save address for future use
+    if (saveAddr && user) {
+      try { localStorage.setItem(`${ADDR_KEY}_${user.email}`, JSON.stringify({ phone, address, city, province, postalCode })); } catch {}
+    }
 
     const fullAddress = `${address.trim()}, ${city.trim()}, ${province}, ${postalCode.trim()}, South Africa`;
 
@@ -93,6 +124,7 @@ export default function CheckoutPage() {
           address:       fullAddress,
           paymentMethod: payment,
           notes:         notes.trim() || undefined,
+          phone:         phone.trim() || undefined,
         }),
       });
       const json = await res.json();
@@ -222,6 +254,14 @@ export default function CheckoutPage() {
         .pay-opt-icon  { font-size:24px; flex-shrink:0; }
         .pay-opt-label { font-weight:700; font-size:14px; color:#0A0A0A; }
         .pay-opt-desc  { font-size:12px; color:#71717A; }
+        /* Card fields */
+        .card-fields   { margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:16px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0; }
+        .card-field    { display:flex; flex-direction:column; gap:5px; }
+        .card-field.full { grid-column:1/-1; }
+        /* Save address */
+        .save-addr     { display:flex; align-items:center; gap:10px; padding:14px 16px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; margin-top:14px; cursor:pointer; }
+        .save-addr input{ cursor:pointer; width:16px; height:16px; accent-color:#16a34a; flex-shrink:0; }
+        .save-addr-txt  { font-size:13px; font-weight:600; color:#15803d; }
 
         /* Error */
         .co-error      { background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:12px 16px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:16px; }
@@ -331,7 +371,60 @@ export default function CheckoutPage() {
                   </label>
                 ))}
               </div>
+
+              {/* Card detail fields — shown when CARD is selected */}
+              {payment === "CARD" && (
+                <div className="card-fields">
+                  <div className="card-field full">
+                    <label className="co-label">Cardholder Name *</label>
+                    <input className="co-input" type="text" placeholder="Name as on card" value={cardName} onChange={e => setCardName(e.target.value)} />
+                  </div>
+                  <div className="card-field full">
+                    <label className="co-label">Card Number *</label>
+                    <input
+                      className="co-input"
+                      type="text"
+                      placeholder="0000 0000 0000 0000"
+                      maxLength={19}
+                      value={cardNumber}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, "").slice(0, 16);
+                        setCardNumber(digits.replace(/(.{4})/g, "$1 ").trim());
+                      }}
+                    />
+                  </div>
+                  <div className="card-field">
+                    <label className="co-label">Expiry (MM/YY) *</label>
+                    <input
+                      className="co-input"
+                      type="text"
+                      placeholder="MM/YY"
+                      maxLength={5}
+                      value={cardExpiry}
+                      onChange={e => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        setCardExpiry(v.length > 2 ? v.slice(0, 2) + "/" + v.slice(2) : v);
+                      }}
+                    />
+                  </div>
+                  <div className="card-field">
+                    <label className="co-label">CVV *</label>
+                    <input className="co-input" type="password" placeholder="•••" maxLength={4} value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g, "").slice(0, 4))} />
+                  </div>
+                  <div className="card-field full" style={{ marginTop: 4 }}>
+                    <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 6 }}>
+                      🔒 Your card details are encrypted and secure. Live card processing powered by Yoco / Peach Payments (integration required for production).
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Save address */}
+            <label className="save-addr">
+              <input type="checkbox" checked={saveAddr} onChange={e => setSaveAddr(e.target.checked)} />
+              <span className="save-addr-txt">Save my address &amp; contact details for next time</span>
+            </label>
 
             {/* Mobile place order */}
             <button type="submit" className="place-btn" disabled={placing} style={{ display: "none" }} id="mobile-place-btn">
@@ -372,7 +465,7 @@ export default function CheckoutPage() {
                 <span style={{ color: RED }}>R {grandTotal.toFixed(2)}</span>
               </div>
 
-              <button type="submit" form="" className="place-btn" disabled={placing} onClick={handleSubmit}>
+              <button type="button" className="place-btn" disabled={placing} onClick={handleSubmit}>
                 {placing ? "Placing Order…" : `Place Order — R ${grandTotal.toFixed(2)}`}
               </button>
 

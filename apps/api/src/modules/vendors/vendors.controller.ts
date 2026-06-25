@@ -107,19 +107,45 @@ export const createService = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
+  const { isDeal, originalPrice } = req.body;
+
   const service = await prisma.service.create({
     data: {
-      name:           name.trim(),
-      description:    description.trim(),
-      price:          parseFloat(String(price)),
+      name:          name.trim(),
+      description:   description.trim(),
+      price:         parseFloat(String(price)),
       category,
-      imageUrl:       imageUrl?.trim() || null,
+      imageUrl:      imageUrl?.trim() || null,
       vendorProfileId: vendorProfile.id,
-      isActive:       false, // requires admin approval before going live
+      isActive:      false,
+      isDeal:        isDeal === true || isDeal === "true",
+      originalPrice: isDeal && originalPrice ? parseFloat(String(originalPrice)) : null,
     }
   });
 
   return res.status(HttpStatus.CREATED).json({ status: "success", data: service });
+});
+
+// ── Toggle deal on a service ──────────────────────────────────────────────────
+export const toggleDeal = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { isDeal, originalPrice } = req.body;
+
+  const vendorProfile = await prisma.vendorProfile.findUnique({ where: { userId: req.user!.userId } });
+  if (!vendorProfile) throw new AppError("Vendor profile not found", HttpStatus.NOT_FOUND);
+
+  const service = await prisma.service.findUnique({ where: { id } });
+  if (!service || service.vendorProfileId !== vendorProfile.id)
+    throw new AppError("Service not found", HttpStatus.NOT_FOUND);
+
+  const updated = await prisma.service.update({
+    where: { id },
+    data: {
+      isDeal:       !!isDeal,
+      originalPrice: isDeal && originalPrice ? parseFloat(String(originalPrice)) : null,
+    },
+  });
+  return res.status(HttpStatus.OK).json({ status: "success", data: updated });
 });
 
 // ── Toggle service active/inactive ────────────────────────────────────────────
@@ -163,16 +189,17 @@ export const getTransactions = catchAsync(async (req: Request, res: Response) =>
   ]);
 
   const transactions = bookings.map(b => ({
-    id:          b.id,
-    clientName:  b.client.displayName || `${b.client.firstName || ""} ${b.client.lastName || ""}`.trim() || "Unknown",
-    clientEmail: b.client.email,
-    clientPhone: b.client.phone || "N/A",
-    service:     b.service.name,
-    category:    b.service.category,
-    amount:      b.totalAmount,
-    status:      b.status,
-    notes:       b.notes,
-    date:        b.createdAt,
+    id:            b.id,
+    clientName:    b.client.displayName || `${b.client.firstName || ""} ${b.client.lastName || ""}`.trim() || "Unknown",
+    clientEmail:   b.client.email,
+    clientPhone:   b.client.phone || "N/A",
+    service:       b.service.name,
+    category:      b.service.category,
+    amount:        b.totalAmount,
+    status:        b.status,
+    paymentMethod: (b.paymentMethod || "N/A").toUpperCase(),
+    notes:         b.notes,
+    date:          b.createdAt,
   }));
 
   return res.status(HttpStatus.OK).json({
@@ -330,35 +357,92 @@ export const getDashboard = catchAsync(async (req: Request, res: Response) => {
     orderBy: { createdAt: "desc" },
   });
 
-  let totalRevenue = 0;
-  let fulfilledDeals = 0;
+  let totalRevenue    = 0;
+  let acceptedRevenue = 0;
+  let fulfilledDeals  = 0;
+  let acceptedCount   = 0;
+  let pendingCount    = 0;
   const recentTransactions = [];
 
   for (const b of bookings) {
     if (b.status === "COMPLETED") {
       totalRevenue += b.totalAmount;
       fulfilledDeals++;
+    } else if (b.status === "ACCEPTED") {
+      acceptedRevenue += b.totalAmount;
+      acceptedCount++;
+    } else if (b.status === "PENDING") {
+      pendingCount++;
     }
     recentTransactions.push({
-      id: b.id,
-      name:
-        b.client.displayName ||
-        `${b.client.firstName || ""} ${b.client.lastName || ""}`.trim() ||
-        "Unknown",
-      email: b.client.email,
-      phoneNumber: b.client.phone || "N/A",
-      deal: b.service.name,
-      amount: b.totalAmount,
-      date: b.createdAt,
+      id:            b.id,
+      name:          b.client.displayName || `${b.client.firstName || ""} ${b.client.lastName || ""}`.trim() || "Unknown",
+      email:         b.client.email,
+      phoneNumber:   b.client.phone || "N/A",
+      deal:          b.service.name,
+      amount:        b.totalAmount,
+      status:        b.status,
+      paymentMethod: (b.paymentMethod || "N/A").toUpperCase(),
+      date:          b.createdAt,
     });
   }
 
   const payload = {
     totalRevenue,
+    acceptedRevenue,
     numberOfDeals: bookings.length,
     fulfilledDeals,
+    acceptedCount,
+    pendingCount,
     transactions: recentTransactions.slice(0, 50),
   };
 
   return res.status(HttpStatus.OK).json({ status: "success", data: payload });
 });
+
+// ── Delete a service ──────────────────────────────────────────────────────────
+export const deleteService = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const vendorProfile = await prisma.vendorProfile.findUnique({ where: { userId: req.user!.userId } });
+  if (!vendorProfile) throw new AppError("Vendor profile not found", HttpStatus.NOT_FOUND);
+
+  const service = await prisma.service.findUnique({ where: { id } });
+  if (!service || service.vendorProfileId !== vendorProfile.id)
+    throw new AppError("Service not found", HttpStatus.NOT_FOUND);
+
+  const activeBookings = await prisma.booking.count({
+    where: { serviceId: id, status: { in: ["PENDING", "ACCEPTED"] } },
+  });
+  if (activeBookings > 0)
+    throw new AppError("Cannot delete a service with active or pending bookings", HttpStatus.BAD_REQUEST);
+
+  await prisma.service.delete({ where: { id } });
+  return res.status(HttpStatus.OK).json({ status: "success", message: "Service deleted" });
+});
+
+// ── Accept / Reject / Complete a booking ─────────────────────────────────────
+async function updateBookingStatus(
+  req:            Request,
+  res:            Response,
+  newStatus:      "ACCEPTED" | "REJECTED" | "COMPLETED",
+  allowedCurrent: string[],
+) {
+  const { id } = req.params;
+  const vendorProfile = await prisma.vendorProfile.findUnique({ where: { userId: req.user!.userId } });
+  if (!vendorProfile) throw new AppError("Vendor profile not found", HttpStatus.NOT_FOUND);
+
+  const booking = await prisma.booking.findUnique({ where: { id }, include: { service: true } });
+  if (!booking || booking.service.vendorProfileId !== vendorProfile.id)
+    throw new AppError("Booking not found", HttpStatus.NOT_FOUND);
+
+  const currentStatus = booking.status as unknown as string;
+  if (!allowedCurrent.includes(currentStatus))
+    throw new AppError(`Booking must be ${allowedCurrent.join(" or ")} to be ${newStatus.toLowerCase()}`, HttpStatus.BAD_REQUEST);
+
+  const updated = await prisma.booking.update({ where: { id }, data: { status: newStatus } });
+  return res.status(HttpStatus.OK).json({ status: "success", data: updated });
+}
+
+export const acceptBooking   = catchAsync((req, res) => updateBookingStatus(req, res, "ACCEPTED",  ["PENDING"]));
+export const rejectBooking   = catchAsync((req, res) => updateBookingStatus(req, res, "REJECTED",  ["PENDING"]));
+export const completeBooking = catchAsync((req, res) => updateBookingStatus(req, res, "COMPLETED", ["ACCEPTED"]));

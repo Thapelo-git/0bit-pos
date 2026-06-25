@@ -148,6 +148,8 @@ model Service {
   category        String
   imageUrl        String?
   isActive        Boolean       @default(false)
+  isDeal          Boolean       @default(false)
+  originalPrice   Float?
   bookings        Booking[]
   reviews         Review[]
 
@@ -156,6 +158,7 @@ model Service {
 
   @@index([vendorProfileId])
   @@index([category])
+  @@index([isDeal])
 }
 
 model Review {

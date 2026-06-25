@@ -11,11 +11,11 @@ function avgRating(reviews: { rating: number }[]) {
 
 // ── Search Services ────────────────────────────────────────────────────────────
 export const searchServices = catchAsync(async (req: Request, res: Response) => {
-  const { category, lat, lng } = req.query;
+  const { category, lat, lng, deals } = req.query;
 
-  const baseWhere = category
-    ? { category: String(category), isActive: true }
-    : { isActive: true };
+  const baseWhere: Record<string, unknown> = { isActive: true };
+  if (category) baseWhere.category = String(category);
+  if (deals === "true") baseWhere.isDeal = true;
 
   if (!lat || !lng) {
     const services = await prisma.service.findMany({
