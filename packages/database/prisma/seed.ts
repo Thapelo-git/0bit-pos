@@ -13,14 +13,14 @@ const __dirname  = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 async function main() {
-  if (!process.env.DATABASE_URL) throw new Error("❌ DATABASE_URL missing from .env");
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL missing from .env");
 
   const pool    = new pg.Pool({ connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL });
   const adapter = new PrismaPg(pool);
   const prisma  = new PrismaClient({ adapter } as any);
 
   try {
-    console.log("🌱 Seeding database...");
+    console.log("Seeding database...");
 
     await prisma.systemSetting.upsert({
       where:  { key: "registration_mode" },
@@ -31,9 +31,10 @@ async function main() {
     await prisma.systemSetting.upsert({
       where:  { key: "app_name" },
       update: {},
-      create: { key: "app_name", value: "My App" },
+      create: { key: "app_name", value: "kasiFix" },
     });
 
+    // Password is reset on every deploy so reviewers always have working credentials
     const password   = await hash("SuperAdmin123!", 12);
     const superAdmin = await prisma.user.upsert({
       where:  { email: "superadmin@example.com" },
@@ -49,27 +50,10 @@ async function main() {
       },
     });
 
-    // Demo admin — separate account so reviewers have a stable login
-    const demoPassword = await hash("Demo@Admin1", 12);
-    const demoAdmin    = await prisma.user.upsert({
-      where:  { email: "admin@kasifix.demo" },
-      update: { password: demoPassword },
-      create: {
-        email:         "admin@kasifix.demo",
-        password:      demoPassword,
-        role:          "ADMIN",
-        accountStatus: "ACTIVE",
-        firstName:     "Demo",
-        lastName:      "Admin",
-        displayName:   "Demo Admin",
-      },
-    }); 
-
-    console.log(`✅ Super admin: ${superAdmin.email}  →  SuperAdmin123!`);
-    console.log(`✅ Demo admin:  ${demoAdmin.email}  →  Demo@Admin1`);
-    console.log(`\n   Both passwords reset to defaults on every deploy.`);
+    console.log(`Super admin: ${superAdmin.email}  ->  SuperAdmin123!`);
+    console.log(`Password resets to default on every deploy.`);
   } catch (error: any) {
-    console.error("❌ Seed error:", error.message);
+    console.error("Seed error:", error.message);
     process.exit(1);
   } finally {
     await prisma.$disconnect();

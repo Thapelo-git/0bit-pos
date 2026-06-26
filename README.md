@@ -22,12 +22,9 @@ pnpm dev
 # API      → http://localhost:3001/api/v1
 ```
 
-Admin credentials (reset automatically on every deploy):
+Admin login: `superadmin@example.com` / `SuperAdmin123!` *(resets to default on every deploy)*
 
-| Account | Email | Password |
-|---|---|---|
-| Super Admin | `superadmin@example.com` | `SuperAdmin123!` |
-| Demo Admin | `admin@kasifix.demo` | `Demo@Admin1` |
+> **Note:** The API is hosted on Render's free tier and sleeps after inactivity. The first request after a period of no use may take 30–60 seconds to respond — this is normal. Refresh once if the page doesn't load immediately.
 
 ---
 
