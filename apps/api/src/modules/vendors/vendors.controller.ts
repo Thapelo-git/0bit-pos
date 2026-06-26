@@ -126,6 +126,36 @@ export const createService = catchAsync(async (req: Request, res: Response) => {
   return res.status(HttpStatus.CREATED).json({ status: "success", data: service });
 });
 
+// ── Update a service (name, description, price, category, image, deal) ───────
+export const updateService = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, description, price, category, imageUrl, isDeal, originalPrice } = req.body;
+
+  const vendorProfile = await prisma.vendorProfile.findUnique({ where: { userId: req.user!.userId } });
+  if (!vendorProfile) throw new AppError("Vendor profile not found", HttpStatus.NOT_FOUND);
+
+  const service = await prisma.service.findUnique({ where: { id } });
+  if (!service || service.vendorProfileId !== vendorProfile.id)
+    throw new AppError("Service not found", HttpStatus.NOT_FOUND);
+
+  const updated = await prisma.service.update({
+    where: { id },
+    data: {
+      ...(name        !== undefined && { name:          name.trim() }),
+      ...(description !== undefined && { description:   description.trim() }),
+      ...(price       !== undefined && { price:         parseFloat(String(price)) }),
+      ...(category    !== undefined && { category }),
+      ...(imageUrl    !== undefined && { imageUrl:      imageUrl || null }),
+      ...(isDeal      !== undefined && { isDeal:        isDeal === true || isDeal === "true" }),
+      ...(originalPrice !== undefined && {
+        originalPrice: isDeal && originalPrice ? parseFloat(String(originalPrice)) : null,
+      }),
+    },
+  });
+
+  return res.status(HttpStatus.OK).json({ status: "success", data: updated });
+});
+
 // ── Toggle deal on a service ──────────────────────────────────────────────────
 export const toggleDeal = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;

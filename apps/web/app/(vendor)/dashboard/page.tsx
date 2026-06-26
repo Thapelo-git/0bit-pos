@@ -47,13 +47,37 @@ export default function VendorDashboard() {
   const [profileMsg,   setProfileMsg]   = useState<{ text: string; ok: boolean } | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
 
-  // Create service form
+  // Create / Edit service form
   const [showForm,   setShowForm]   = useState(false);
+  const [editingId,  setEditingId]  = useState<string | null>(null);
   const [form,       setForm]       = useState({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "" });
   const [imageMode,  setImageMode]  = useState<"file" | "url">("file");
   const [formMsg,    setFormMsg]    = useState<{ text: string; ok: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [aiDescBusy, setAiDescBusy] = useState(false);
+
+  const openEdit = (svc: any) => {
+    setEditingId(svc.id);
+    setForm({
+      name:          svc.name          || "",
+      description:   svc.description   || "",
+      price:         String(svc.price  || ""),
+      category:      svc.category      || CATEGORIES[0],
+      imageUrl:      svc.imageUrl      || "",
+      isDeal:        svc.isDeal        || false,
+      originalPrice: svc.originalPrice ? String(svc.originalPrice) : "",
+    });
+    setImageMode(svc.imageUrl?.startsWith("data:") ? "file" : "url");
+    setFormMsg(null);
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "" });
+    setFormMsg(null);
+  };
 
   const generateDescription = async () => {
     if (!form.name.trim() || !form.category) return;
@@ -189,27 +213,35 @@ export default function VendorDashboard() {
     e.preventDefault();
     setSubmitting(true);
     setFormMsg(null);
+    const body = {
+      ...form,
+      price:         parseFloat(form.price),
+      imageUrl:      form.imageUrl || undefined,
+      isDeal:        form.isDeal,
+      originalPrice: form.isDeal && form.originalPrice ? parseFloat(form.originalPrice) : undefined,
+    };
     try {
-      const res = await fetch(`${API}/vendors/services`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          price:         parseFloat(form.price),
-          imageUrl:      form.imageUrl || undefined,
-          isDeal:        form.isDeal,
-          originalPrice: form.isDeal && form.originalPrice ? parseFloat(form.originalPrice) : undefined,
-        }),
-        credentials: "include",
-      });
+      const isEdit = !!editingId;
+      const res = await fetch(
+        isEdit ? `${API}/vendors/services/${editingId}` : `${API}/vendors/services`,
+        {
+          method:  isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(body),
+          credentials: "include",
+        }
+      );
       const json = await res.json();
       if (json.status === "success") {
-        setFormMsg({ text: "Service created successfully!", ok: true });
-        setServices(prev => [json.data, ...prev]);
-        setForm({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "" });
-        setTimeout(() => { setShowForm(false); setFormMsg(null); }, 1500);
+        setFormMsg({ text: isEdit ? "Service updated!" : "Service created successfully!", ok: true });
+        if (isEdit) {
+          setServices(prev => prev.map(s => s.id === editingId ? { ...s, ...json.data } : s));
+        } else {
+          setServices(prev => [json.data, ...prev]);
+        }
+        setTimeout(() => closeForm(), 1500);
       } else {
-        setFormMsg({ text: json.message || "Failed to create service.", ok: false });
+        setFormMsg({ text: json.message || "Failed to save service.", ok: false });
       }
     } catch {
       setFormMsg({ text: "Network error. Please try again.", ok: false });
@@ -502,10 +534,16 @@ export default function VendorDashboard() {
                             <Link href={`/services/${svc.id}`} style={{
                               padding: "9px 12px", background: "#f8f8f8", border: "1px solid #eaeaea",
                               borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#333",
-                              textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, flex: 1, justifyContent: "center",
+                              textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, justifyContent: "center",
                             }}>
                               👁 Preview
                             </Link>
+                            <button
+                              style={{ padding: "9px 12px", background: "#dbeafe", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 700, color: "#1e40af", cursor: "pointer" }}
+                              onClick={() => openEdit(svc)}
+                            >
+                              ✏️ Edit
+                            </button>
                             <button
                               className="btn-delete"
                               disabled={deletingId === svc.id}
@@ -579,9 +617,9 @@ export default function VendorDashboard() {
 
       {/* Create Service Modal */}
       {showForm && (
-        <div className="form-overlay" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
+        <div className="form-overlay" onClick={e => { if (e.target === e.currentTarget) closeForm(); }}>
           <div className="form-modal">
-            <h3>Create New Service</h3>
+            <h3>{editingId ? "Edit Service" : "Create New Service"}</h3>
             <form onSubmit={handleCreateService}>
               <div className="form-group">
                 <label className="form-label">Service Name *</label>
@@ -794,9 +832,9 @@ export default function VendorDashboard() {
 
               <div className="form-actions">
                 <button type="submit" className="btn-primary" disabled={submitting} style={{ flex: 1, padding: "13px" }}>
-                  {submitting ? "Creating..." : "Create Service"}
+                  {submitting ? "Saving..." : editingId ? "Update Service" : "Create Service"}
                 </button>
-                <button type="button" className="btn-outline" onClick={() => { setShowForm(false); setFormMsg(null); }}>
+                <button type="button" className="btn-outline" onClick={closeForm}>
                   Cancel
                 </button>
               </div>

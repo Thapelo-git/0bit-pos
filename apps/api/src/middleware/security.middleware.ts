@@ -8,7 +8,7 @@ import { HttpStatus } from "@repo/types";
  */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 100,
   message: { status: "fail", message: "Too many attempts from this IP, please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,

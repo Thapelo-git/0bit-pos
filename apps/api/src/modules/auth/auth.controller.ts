@@ -199,6 +199,9 @@ export const changePassword = catchAsync(async (req: Request, res: Response) => 
   const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
   if (!user || !user.password) throw new AppError("User not found", HttpStatus.NOT_FOUND);
 
+  if ((user.role as unknown as string) === "SUPER_ADMIN")
+    throw new AppError("The super admin password cannot be changed here. Update it in the server environment.", HttpStatus.FORBIDDEN);
+
   const match = await authService.verifyPassword(currentPassword, user.password);
   if (!match) throw new AppError("Current password is incorrect", HttpStatus.UNAUTHORIZED);
 

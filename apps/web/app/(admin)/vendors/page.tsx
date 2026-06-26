@@ -38,7 +38,13 @@ interface ServiceRow {
   category: string;
   imageUrl?: string;
   isActive: boolean;
-  vendorProfile?: { businessName?: string; locationText?: string };
+  isDeal?: boolean;
+  originalPrice?: number;
+  vendorProfile?: {
+    businessName?: string;
+    locationText?: string;
+    user?: { email?: string; accountStatus?: string };
+  };
 }
 
 export default function AdminDashboard() {
@@ -50,6 +56,7 @@ export default function AdminDashboard() {
   const [actionId,   setActionId]   = useState<string | null>(null);
   const [error,      setError]      = useState<string | null>(null);
   const [vendorPage,   setVendorPage]   = useState(1);
+  const [selectedSvc,  setSelectedSvc]  = useState<ServiceRow | null>(null);
   const [pwForm,       setPwForm]       = useState({ current: "", next: "", confirm: "" });
   const [pwMsg,        setPwMsg]        = useState<{ ok: boolean; text: string } | null>(null);
   const [pwBusy,       setPwBusy]       = useState(false);
@@ -546,6 +553,13 @@ export default function AdminDashboard() {
                             </p>
                           )}
                           <div className="svc-card-actions">
+                            <button
+                              className="act-btn"
+                              style={{ background: "#f1f5f9", color: "#1e293b", flex: 1, padding: "10px" }}
+                              onClick={() => setSelectedSvc(svc)}
+                            >
+                              🔍 View Details
+                            </button>
                             {!svc.isActive ? (
                               <button
                                 className="act-btn act-approve"
@@ -553,7 +567,7 @@ export default function AdminDashboard() {
                                 onClick={() => updateServiceStatus(svc.id, "approve")}
                                 style={{ flex: 1, padding: "10px" }}
                               >
-                                {actionId === svc.id ? "..." : "✓ Approve & Go Live"}
+                                {actionId === svc.id ? "..." : "✓ Approve"}
                               </button>
                             ) : (
                               <button
@@ -562,7 +576,7 @@ export default function AdminDashboard() {
                                 onClick={() => updateServiceStatus(svc.id, "reject")}
                                 style={{ flex: 1, padding: "10px" }}
                               >
-                                {actionId === svc.id ? "..." : "✗ Take Offline"}
+                                {actionId === svc.id ? "..." : "✗ Offline"}
                               </button>
                             )}
                           </div>
@@ -648,6 +662,116 @@ export default function AdminDashboard() {
           </div>
         </main>
       </div>
+
+      {/* ── SERVICE DETAIL MODAL ─────────────────────────────────────── */}
+      {selectedSvc && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setSelectedSvc(null); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
+        >
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
+            {/* Image */}
+            <div style={{ position: "relative", height: 220, background: "#f1f5f9", borderRadius: "16px 16px 0 0", overflow: "hidden" }}>
+              <img
+                src={selectedSvc.imageUrl || catImg(selectedSvc.category)}
+                alt={selectedSvc.name}
+                onError={e => { (e.target as HTMLImageElement).src = catImg(selectedSvc.category); }}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+              <span style={{
+                position: "absolute", top: 12, left: 12,
+                background: selectedSvc.isActive ? "#10b981" : "#f59e0b",
+                color: "#fff", fontSize: 11, fontWeight: 800,
+                padding: "4px 10px", borderRadius: 20,
+              }}>
+                {selectedSvc.isActive ? "✓ LIVE" : "⏳ PENDING APPROVAL"}
+              </span>
+              <button
+                onClick={() => setSelectedSvc(null)}
+                style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,.5)", border: "none", color: "#fff", borderRadius: "50%", width: 32, height: 32, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
+              >×</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "24px 28px" }}>
+              {/* Category + name */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: RED, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 6 }}>{selectedSvc.category}</div>
+              <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 900, color: "#1e293b" }}>{selectedSvc.name}</h2>
+
+              {/* Price row */}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: "10px 0 16px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 26, fontWeight: 900, color: RED }}>R {Number(selectedSvc.price).toFixed(2)}</span>
+                {selectedSvc.originalPrice && (
+                  <>
+                    <span style={{ fontSize: 15, color: "#9ca3af", textDecoration: "line-through" }}>R {Number(selectedSvc.originalPrice).toFixed(2)}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: "#16a34a", background: "#dcfce7", padding: "2px 8px", borderRadius: 20 }}>
+                      {Math.round(((Number(selectedSvc.originalPrice) - Number(selectedSvc.price)) / Number(selectedSvc.originalPrice)) * 100)}% off
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Description */}
+              {selectedSvc.description && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>Description</div>
+                  <p style={{ margin: 0, fontSize: 14, color: "#374151", lineHeight: 1.7 }}>{selectedSvc.description}</p>
+                </div>
+              )}
+
+              {/* Vendor info */}
+              <div style={{ background: "#f8fafc", borderRadius: 10, padding: "14px 16px", marginBottom: 20, fontSize: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 10 }}>Vendor</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 16px" }}>
+                  <div><span style={{ color: "#64748b" }}>Business: </span><strong>{selectedSvc.vendorProfile?.businessName || "—"}</strong></div>
+                  <div><span style={{ color: "#64748b" }}>Email: </span><strong style={{ wordBreak: "break-all" }}>{selectedSvc.vendorProfile?.user?.email || "—"}</strong></div>
+                  <div><span style={{ color: "#64748b" }}>Location: </span><strong>{selectedSvc.vendorProfile?.locationText || "—"}</strong></div>
+                  <div><span style={{ color: "#64748b" }}>Account: </span>
+                    <span style={{ fontWeight: 700, color: selectedSvc.vendorProfile?.user?.accountStatus === "ACTIVE" ? "#10b981" : "#f59e0b" }}>
+                      {selectedSvc.vendorProfile?.user?.accountStatus || "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: "flex", gap: 10 }}>
+                {!selectedSvc.isActive ? (
+                  <button
+                    className="act-btn act-approve"
+                    disabled={actionId === selectedSvc.id}
+                    style={{ flex: 1, padding: "12px" }}
+                    onClick={async () => {
+                      await updateServiceStatus(selectedSvc.id, "approve");
+                      setSelectedSvc(prev => prev ? { ...prev, isActive: true } : null);
+                    }}
+                  >
+                    {actionId === selectedSvc.id ? "..." : "✓ Approve & Go Live"}
+                  </button>
+                ) : (
+                  <button
+                    className="act-btn act-suspend"
+                    disabled={actionId === selectedSvc.id}
+                    style={{ flex: 1, padding: "12px" }}
+                    onClick={async () => {
+                      await updateServiceStatus(selectedSvc.id, "reject");
+                      setSelectedSvc(prev => prev ? { ...prev, isActive: false } : null);
+                    }}
+                  >
+                    {actionId === selectedSvc.id ? "..." : "✗ Take Offline"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedSvc(null)}
+                  style={{ padding: "12px 20px", borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontWeight: 700, cursor: "pointer", fontSize: 14 }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

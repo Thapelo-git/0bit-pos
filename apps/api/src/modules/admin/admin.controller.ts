@@ -250,9 +250,14 @@ export const updateVendorStatus = catchAsync(async (req: Request, res: Response)
   await prisma.user.update({ where: { id }, data: { accountStatus } });
 
   if (vendor.vendorProfile) {
+    const profileActive = accountStatus === "ACTIVE";
     await prisma.vendorProfile.update({
       where: { id: vendor.vendorProfile.id },
-      data: { isActive: accountStatus === "ACTIVE" }
+      data:  { isActive: profileActive },
+    });
+    await prisma.service.updateMany({
+      where: { vendorProfileId: vendor.vendorProfile.id },
+      data:  { isActive: profileActive },
     });
   }
 
@@ -316,6 +321,11 @@ export const approveVendor = catchAsync(async (req: Request, res: Response) => {
     await prisma.vendorProfile.update({
       where: { id: vendor.vendorProfile.id },
       data: { isActive: true },
+    });
+    // Auto-activate all services belonging to this vendor
+    await prisma.service.updateMany({
+      where: { vendorProfileId: vendor.vendorProfile.id },
+      data:  { isActive: true },
     });
   }
 

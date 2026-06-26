@@ -26,6 +26,12 @@ Admin login: `superadmin@example.com` / `SuperAdmin123!` *(resets to default on 
 
 > **Note:** The API is hosted on Render's free tier and sleeps after inactivity. The first request after a period of no use may take 30–60 seconds to respond — this is normal. Refresh once if the page doesn't load immediately.
 
+**To see the full flow as a reviewer:**
+1. Log in as a vendor (`vendor@kasifix.demo` / any password you set during vendor signup at `/vendor/signup`)
+2. Create a service listing
+3. Log in as admin → **Service Listings tab** → click **"🔍 View Details"** then **"✓ Approve & Go Live"**
+4. The service is now visible to customers on the marketplace
+
 ---
 
 ## 02 — Stack and AI Tools Used
