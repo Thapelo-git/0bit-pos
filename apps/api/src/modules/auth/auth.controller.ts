@@ -187,6 +187,30 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// ── Change password (logged-in user) ──────────────────────────────────────────
+
+export const changePassword = catchAsync(async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword)
+    throw new AppError("Current password and new password are required", HttpStatus.BAD_REQUEST);
+  if (newPassword.length < 8)
+    throw new AppError("New password must be at least 8 characters", HttpStatus.BAD_REQUEST);
+
+  const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+  if (!user || !user.password) throw new AppError("User not found", HttpStatus.NOT_FOUND);
+
+  const match = await authService.verifyPassword(currentPassword, user.password);
+  if (!match) throw new AppError("Current password is incorrect", HttpStatus.UNAUTHORIZED);
+
+  const hashed = await authService.hashPassword(newPassword);
+  await prisma.user.update({ where: { id: req.user!.userId }, data: { password: hashed } });
+
+  await prisma.auditLog.create({ data: { userId: req.user!.userId, action: "PASSWORD_CHANGED" } });
+  req.auditLogged = true;
+
+  return res.status(HttpStatus.OK).json({ status: "success", message: "Password changed successfully." });
+});
+
 // ── Self register (only if registration mode allows) ──────────────────────────
 
 export const register = catchAsync(async (req: Request, res: Response) => {

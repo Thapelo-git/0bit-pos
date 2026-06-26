@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
-const RED  = "#DC143C";
+const API             = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+const RED             = "#DC143C";
+const VENDOR_PAGE_SIZE = 10;
 
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=400&auto=format&fit=crop",
@@ -17,7 +18,7 @@ function catImg(category: string) {
   return CATEGORY_IMAGES[category] || CATEGORY_IMAGES["Other Local Services"];
 }
 
-type AdminTab = "vendors" | "services";
+type AdminTab = "vendors" | "services" | "password";
 
 interface VendorRow {
   id: string;
@@ -41,13 +42,17 @@ interface ServiceRow {
 }
 
 export default function AdminDashboard() {
-  const [tab,      setTab]      = useState<AdminTab>("vendors");
-  const [vendors,  setVendors]  = useState<VendorRow[]>([]);
-  const [services, setServices] = useState<ServiceRow[]>([]);
-  const [search,   setSearch]   = useState("");
-  const [loading,  setLoading]  = useState(true);
-  const [actionId, setActionId] = useState<string | null>(null);
-  const [error,    setError]    = useState<string | null>(null);
+  const [tab,        setTab]        = useState<AdminTab>("vendors");
+  const [vendors,    setVendors]    = useState<VendorRow[]>([]);
+  const [services,   setServices]   = useState<ServiceRow[]>([]);
+  const [search,     setSearch]     = useState("");
+  const [loading,    setLoading]    = useState(true);
+  const [actionId,   setActionId]   = useState<string | null>(null);
+  const [error,      setError]      = useState<string | null>(null);
+  const [vendorPage,   setVendorPage]   = useState(1);
+  const [pwForm,       setPwForm]       = useState({ current: "", next: "", confirm: "" });
+  const [pwMsg,        setPwMsg]        = useState<{ ok: boolean; text: string } | null>(null);
+  const [pwBusy,       setPwBusy]       = useState(false);
 
   // Metrics derived from vendors
   const metrics = {
@@ -140,6 +145,13 @@ export default function AdminDashboard() {
       v.vendorProfile?.locationText?.toLowerCase().includes(q)
     );
   });
+
+  const vendorTotalPages  = Math.max(1, Math.ceil(filteredVendors.length / VENDOR_PAGE_SIZE));
+  const vendorPageClamped = Math.min(vendorPage, vendorTotalPages);
+  const paginatedVendors  = filteredVendors.slice(
+    (vendorPageClamped - 1) * VENDOR_PAGE_SIZE,
+    vendorPageClamped * VENDOR_PAGE_SIZE,
+  );
 
   const filteredServices = services.filter(s => {
     if (!search) return true;
@@ -255,6 +267,9 @@ export default function AdminDashboard() {
             <button className={`adm-nav-btn${tab === "services" ? " on" : ""}`} onClick={() => { setTab("services"); setSearch(""); }}>
               🛠 Service Listings
             </button>
+            <button className={`adm-nav-btn${tab === "password" ? " on" : ""}`} onClick={() => { setTab("password"); setSearch(""); setPwMsg(null); }}>
+              🔑 Change Password
+            </button>
           </nav>
           <div className="adm-foot">
             <button className="adm-logout" onClick={async () => {
@@ -297,12 +312,14 @@ export default function AdminDashboard() {
 
           <div className="adm-content">
             <h1 className="adm-title">
-              {tab === "vendors" ? "Service Providers" : "Service Listings"}
+              {tab === "vendors" ? "Service Providers" : tab === "services" ? "Service Listings" : "Change Password"}
             </h1>
             <p className="adm-sub">
               {tab === "vendors"
                 ? "Approve, suspend, or manage all registered service providers"
-                : "Review and approve service listings submitted by vendors"}
+                : tab === "services"
+                ? "Review and approve service listings submitted by vendors"
+                : "Update your admin account password"}
             </p>
 
             {error && (
@@ -318,6 +335,9 @@ export default function AdminDashboard() {
               </button>
               <button className={`adm-tab${tab === "services" ? " on" : ""}`} onClick={() => { setTab("services"); setSearch(""); }}>
                 🛠 Service Listings {svcMetrics.pending > 0 && <span style={{ marginLeft: "6px", background: RED, color: "#fff", borderRadius: "10px", padding: "1px 7px", fontSize: "11px" }}>{svcMetrics.pending}</span>}
+              </button>
+              <button className={`adm-tab${tab === "password" ? " on" : ""}`} onClick={() => { setTab("password"); setSearch(""); setPwMsg(null); }}>
+                🔑 Change Password
               </button>
             </div>
 
@@ -352,7 +372,7 @@ export default function AdminDashboard() {
                     type="text"
                     placeholder="Search by name, email or location..."
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => { setSearch(e.target.value); setVendorPage(1); }}
                   />
                 </div>
 
@@ -376,7 +396,7 @@ export default function AdminDashboard() {
                         <tr><td colSpan={9} style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>Loading vendors...</td></tr>
                       ) : filteredVendors.length === 0 ? (
                         <tr><td colSpan={9} style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>No vendors found.</td></tr>
-                      ) : filteredVendors.map(v => (
+                      ) : paginatedVendors.map(v => (
                         <tr key={v.id}>
                           <td style={{ fontWeight: 700 }}>{v.vendorProfile?.businessName || v.displayName || "—"}</td>
                           <td style={{ color: "#64748b" }}>{v.email}</td>
@@ -420,6 +440,34 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination */}
+                {vendorTotalPages > 1 && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "16px", flexWrap: "wrap", gap: "8px" }}>
+                    <span style={{ fontSize: "13px", color: "#64748b" }}>
+                      Showing {(vendorPageClamped - 1) * VENDOR_PAGE_SIZE + 1}–{Math.min(vendorPageClamped * VENDOR_PAGE_SIZE, filteredVendors.length)} of {filteredVendors.length} vendors
+                    </span>
+                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                      <button
+                        onClick={() => setVendorPage(p => Math.max(1, p - 1))}
+                        disabled={vendorPageClamped === 1}
+                        style={{ padding: "6px 14px", borderRadius: "6px", border: "1.5px solid #e2e8f0", background: vendorPageClamped === 1 ? "#f8fafc" : "#fff", color: vendorPageClamped === 1 ? "#94a3b8" : "#1e293b", fontWeight: 700, cursor: vendorPageClamped === 1 ? "not-allowed" : "pointer", fontSize: "13px" }}
+                      >← Prev</button>
+                      {Array.from({ length: vendorTotalPages }, (_, i) => i + 1).map(pg => (
+                        <button
+                          key={pg}
+                          onClick={() => setVendorPage(pg)}
+                          style={{ padding: "6px 12px", borderRadius: "6px", border: `1.5px solid ${pg === vendorPageClamped ? RED : "#e2e8f0"}`, background: pg === vendorPageClamped ? RED : "#fff", color: pg === vendorPageClamped ? "#fff" : "#1e293b", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}
+                        >{pg}</button>
+                      ))}
+                      <button
+                        onClick={() => setVendorPage(p => Math.min(vendorTotalPages, p + 1))}
+                        disabled={vendorPageClamped === vendorTotalPages}
+                        style={{ padding: "6px 14px", borderRadius: "6px", border: "1.5px solid #e2e8f0", background: vendorPageClamped === vendorTotalPages ? "#f8fafc" : "#fff", color: vendorPageClamped === vendorTotalPages ? "#94a3b8" : "#1e293b", fontWeight: 700, cursor: vendorPageClamped === vendorTotalPages ? "not-allowed" : "pointer", fontSize: "13px" }}
+                      >Next →</button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
@@ -524,6 +572,78 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </>
+            )}
+
+            {/* ── CHANGE PASSWORD TAB ───────────────────────────────── */}
+            {tab === "password" && (
+              <div style={{ maxWidth: 480 }}>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (pwForm.next !== pwForm.confirm) {
+                      setPwMsg({ ok: false, text: "New passwords do not match." });
+                      return;
+                    }
+                    if (pwForm.next.length < 8) {
+                      setPwMsg({ ok: false, text: "New password must be at least 8 characters." });
+                      return;
+                    }
+                    setPwBusy(true);
+                    setPwMsg(null);
+                    try {
+                      const res  = await fetch(`${API}/auth/change-password`, {
+                        method:      "PATCH",
+                        headers:     { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body:        JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+                      });
+                      const json = await res.json();
+                      if (json.status === "success") {
+                        setPwMsg({ ok: true, text: "Password changed successfully." });
+                        setPwForm({ current: "", next: "", confirm: "" });
+                      } else {
+                        setPwMsg({ ok: false, text: json.message || "Failed to change password." });
+                      }
+                    } catch {
+                      setPwMsg({ ok: false, text: "Network error. Please try again." });
+                    }
+                    setPwBusy(false);
+                  }}
+                  style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", padding: "32px 36px", display: "flex", flexDirection: "column", gap: 20 }}
+                >
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#1e293b" }}>Change Password</h2>
+
+                  {pwMsg && (
+                    <div style={{ background: pwMsg.ok ? "#d1fae5" : "#fee2e2", color: pwMsg.ok ? "#065f46" : "#991b1b", border: `1px solid ${pwMsg.ok ? "#6ee7b7" : "#fca5a5"}`, borderRadius: 8, padding: "12px 16px", fontWeight: 600, fontSize: 14 }}>
+                      {pwMsg.ok ? "✓ " : "✗ "}{pwMsg.text}
+                    </div>
+                  )}
+
+                  {(["current", "next", "confirm"] as const).map((field) => (
+                    <div key={field} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>
+                        {field === "current" ? "Current Password" : field === "next" ? "New Password" : "Confirm New Password"}
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={pwForm[field]}
+                        onChange={e => setPwForm(p => ({ ...p, [field]: e.target.value }))}
+                        placeholder={field === "current" ? "Enter your current password" : field === "next" ? "At least 8 characters" : "Repeat new password"}
+                        style={{ padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 14, outline: "none" }}
+                      />
+                    </div>
+                  ))}
+
+                  <button
+                    type="submit"
+                    disabled={pwBusy}
+                    style={{ background: RED, color: "#fff", border: "none", borderRadius: 8, padding: "12px", fontWeight: 800, fontSize: 15, cursor: pwBusy ? "not-allowed" : "pointer", opacity: pwBusy ? 0.7 : 1 }}
+                  >
+                    {pwBusy ? "Saving..." : "Update Password"}
+                  </button>
+                </form>
+              </div>
             )}
           </div>
         </main>

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { protect } from "../../middleware/auth.middleware.js";
 import {
   login, logout, getMe,
-  setPassword, forgotPassword, resetPassword, register,
+  setPassword, forgotPassword, resetPassword, register, changePassword,
 } from "./auth.controller.js";
 import { googleRedirect, googleCallback } from "./google-oauth.controller.js";
 
@@ -86,6 +86,8 @@ router.post("/forgot-password", forgotPassword);
  *     summary: Reset password with token
  */
 router.post("/reset-password", resetPassword);
+
+router.patch("/change-password", protect, changePassword);
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 router.get("/google",          googleRedirect);

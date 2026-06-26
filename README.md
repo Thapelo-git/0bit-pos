@@ -1,141 +1,81 @@
-# 0bit Template
+# kasiFix — South African Local Service Marketplace
 
-A full-stack monorepo template by Koveral. Ships with auth, role-based access, super admin and admin dashboards — ready to extend.
-
-## Stack
-
-- **Frontend**: Next.js 16 (App Router) — `apps/web`
-- **Backend**: Express + TypeScript — `apps/api`
-- **Database**: PostgreSQL via Prisma + Supabase
-- **Monorepo**: Turborepo + pnpm workspaces
-- **Auth**: JWT + httpOnly cookies
-
-## Roles
-
-| Role          | Access                              |
-|---------------|-------------------------------------|
-| `SUPER_ADMIN` | Full platform access, manages admins |
-| `ADMIN`       | Manages users, platform settings    |
-| `USER`        | Custom — add your own dashboard     |
-
-## Quick Start
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/your-org/your-repo
-cd your-repo
-pnpm install
-```
-
-### 2. Set up environment
-
-```bash
-cp .env.example .env
-```
-
-Fill in `.env`:
-
-```env
-# Database (from Supabase)
-DATABASE_URL=postgresql://...
-DIRECT_URL=postgresql://...
-
-# Auth
-JWT_SECRET=your-secret-key-here
-
-# URLs
-FRONTEND_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
-
-# Email (Resend)
-RESEND_API_KEY=re_...
-SENDER_EMAIL=noreply@yourdomain.com
-
-# AI (optional)
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-### 3. Start development
-
-```bash
-pnpm dev
-```
-
-- Frontend: http://localhost:3000
-- API: http://localhost:3001
-
-> The API automatically creates the database schema and seeds the super admin on first start — no manual migration steps needed.
-
-Default super admin credentials:
-- Email: `superadmin@example.com`
-- Password: `SuperAdmin123!`
-
-⚠️ **Change this password immediately after first login.**
-
-## Project Structure
-
-```
-apps/
-├── api/          Express API
-│   └── src/
-│       ├── modules/
-│       │   ├── auth/         Login, invite, verify
-│       │   ├── users/        User CRUD
-│       │   ├── admin/        Admin dashboard + user management
-│       │   ├── super-admin/  Platform stats + admin management
-│       │   └── system/       Health check
-│       ├── middleware/       Auth, roles, errors
-│       └── services/         Mail, SMS, storage
-└── web/          Next.js frontend
-    └── src/
-        ├── features/
-        │   └── auth/         Login, set-password, verify pages
-        ├── shared/
-        │   ├── components/   UI components, layout, sidebar
-        │   ├── context/      Auth, Theme
-        │   └── config/       Nav config
-        └── app/
-            ├── (auth)/       Public auth pages
-            ├── (dashboard)/  Protected dashboard pages
-            └── (marketing)/  Public landing page
-
-packages/
-├── database/     Prisma client + schema
-├── types/        Shared TypeScript types
-└── ...
-```
-
-## Customising
-
-### Add a new role
-
-1. Add to `packages/database/prisma/schema.prisma` → `enum Role`
-2. Add to `packages/types/src/enums.ts` → `Role`
-3. Add nav items to `apps/web/src/shared/config/nav.config.ts`
-4. Create dashboard pages in `apps/web/app/(dashboard)/your-role/`
-5. Create API module in `apps/api/src/modules/your-module/`
-
-### Change app name
-
-Search and replace `My App` with your project name across:
-- `apps/web/src/features/marketing/pages/LandingPage.tsx`
-- `packages/database/prisma/seed.ts`
-- `README.md`
-
-### Enable self-registration
-
-In the admin settings dashboard, toggle registration mode from `INVITE_ONLY` to `SELF_REGISTER`.
-
-## Deployment
-
-This template is configured for:
-- **Frontend**: Vercel
-- **API**: Railway
-- **Database**: Supabase
-
-Deployed automatically via the Koveral bootstrapper when you create a new project in O-Bit.
+A marketplace connecting South African homeowners with verified local service providers: cleaning, plumbing, personal training, beauty, tutoring, and more.
 
 ---
 
-Built with ❤️ by [Koveral](https://koveral.com)
+## 01 — How to Run It
+
+**Deployed:** (https://0bit-pos.vercel.app) 
+
+**Local setup:**
+```bash
+git clone https://github.com/Thapelo-git/0bit-pos.git
+cd 0bit-pos
+pnpm install
+
+# Copy and fill in your env variables
+cp .env.example .env
+
+pnpm dev
+# Frontend → http://localhost:3000
+# API      → http://localhost:3001/api/v1
+```
+
+Admin credentials (reset automatically on every deploy):
+
+| Account | Email | Password |
+|---|---|---|
+| Super Admin | `superadmin@example.com` | `SuperAdmin123!` |
+| Demo Admin | `admin@kasifix.demo` | `Demo@Admin1` |
+
+---
+
+## 02 — Stack and AI Tools Used
+
+**Stack:** Next.js 16 (App Router), React 19, Express 4 + TypeScript, PostgreSQL via Prisma, Supabase (hosted DB), Turborepo + pnpm monorepo, JWT in httpOnly cookies.
+
+**AI — Smart Search (local keyword classifier):**
+The original search called OpenAI. When quota errors hit under light load, I replaced it with a keyword classifier I wrote myself — ~25 domain terms per service category scored against the user's query. It runs in-process, costs nothing, and never fails. The feature goal (map natural language → service category) is fully met without the dependency.
+
+**AI — Description Writer:**
+Vendors can generate a service listing description with one click. This calls OpenAI if a key is present; it silently falls back to handwritten per-category templates if not. The prompt targets South African English and emphasises reliability — what the local market responds to.
+
+---
+
+## 03 — Key Decisions Made
+
+**1. Vendor approval gate.**
+New vendors sit at `PENDING` until an admin approves them. An open signup would flood the marketplace with unverified providers and break customer trust before the platform has any reputation. The gate adds vendor friction but protects the customer side, which is harder to win back.
+
+**2. Cart lives in localStorage, not on the server.**
+Customers can browse and add services without an account. Forcing login before the cart exists kills conversion. The trade-off is cart loss on device switch — acceptable at this stage.
+
+**3. Keyword classifier over cloud LLM for search.**
+API cost and quota unpredictability would make search unreliable in production. A deterministic classifier I control is more trustworthy than a dependency on a third-party rate limit.
+
+---
+
+## 04 — What I Chose Not to Build
+
+- **In-app messaging** — customer/vendor chat would be the single most valuable feature, but building it correctly (WebSockets, read receipts, notifications) takes more time than was available. Phone number is shown on the booking instead as a stop-gap.
+- **Real payment processing** — Peach Payments or Ozow integration is a weekend project on its own. Payment method is recorded (EFT, Card, Cash) but no money moves through the platform yet.
+- **Mobile app** — The web is fully responsive. A native app is not the right first investment before product-market fit is established.
+
+---
+
+## 05 — What I Would Build Next
+
+**In-app messaging between customer and vendor.** Right now the only coordination channel is a phone number visible after booking. A threaded conversation tied to a specific booking — with push notifications — would reduce no-shows, clarify scope, and give the platform a data advantage. That's the feature that makes the marketplace sticky rather than just a discovery tool.
+
+---
+
+## 06 — Most Critical Observation About eXobe
+
+eXobe surfaces opportunity but does not own the service relationship. A homeowner finds a provider, contact details are exchanged, and everything that follows — negotiation, scheduling, payment, quality assurance — happens off-platform. That means eXobe has no visibility into whether the job was done, no leverage on quality, and no way to build the trust layer that justifies charging a platform fee.
+
+kasiFix was built specifically toward closing that loop: the vendor accepts the booking in-platform, the job is marked complete in-platform, and payment method is recorded. It is a small step but it is the right direction. The critical next step — which I did not have time to build — is keeping payment on-platform, because that is what converts a listing directory into a marketplace with real network effects.
+
+---
+
+*Thapelo Chaba — O-Bit Developer Programme, June 2026*

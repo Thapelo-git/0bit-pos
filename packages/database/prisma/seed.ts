@@ -37,7 +37,7 @@ async function main() {
     const password   = await hash("SuperAdmin123!", 12);
     const superAdmin = await prisma.user.upsert({
       where:  { email: "superadmin@example.com" },
-      update: {},
+      update: { password },
       create: {
         email:         "superadmin@example.com",
         password,
@@ -49,9 +49,25 @@ async function main() {
       },
     });
 
-    console.log(`✅ Super admin: ${superAdmin.email}`);
-    console.log(`   Password: SuperAdmin123!`);
-    console.log(`\n⚠️  Change this password immediately after first login!`);
+    // Demo admin — separate account so reviewers have a stable login
+    const demoPassword = await hash("Demo@Admin1", 12);
+    const demoAdmin    = await prisma.user.upsert({
+      where:  { email: "admin@kasifix.demo" },
+      update: { password: demoPassword },
+      create: {
+        email:         "admin@kasifix.demo",
+        password:      demoPassword,
+        role:          "ADMIN",
+        accountStatus: "ACTIVE",
+        firstName:     "Demo",
+        lastName:      "Admin",
+        displayName:   "Demo Admin",
+      },
+    }); 
+
+    console.log(`✅ Super admin: ${superAdmin.email}  →  SuperAdmin123!`);
+    console.log(`✅ Demo admin:  ${demoAdmin.email}  →  Demo@Admin1`);
+    console.log(`\n   Both passwords reset to defaults on every deploy.`);
   } catch (error: any) {
     console.error("❌ Seed error:", error.message);
     process.exit(1);

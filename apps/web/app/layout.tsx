@@ -4,8 +4,8 @@ import { AuthProvider } from "@/shared/context/AuthContext";
 import { ThemeProvider } from "@/shared/context/ThemeContext";
 
 export const metadata: Metadata = {
-  title: "O-Bit — Agency Platform",
-  description: "Project delivery operating system",
+  title: "kasiFix — Marketplace",
+  description: "South Africa's local service marketplace",
 };
 
 export default function RootLayout({
