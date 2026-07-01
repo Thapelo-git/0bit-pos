@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Phone, Mail, MapPin, Clock, MessageCircle, CheckCircle2 } from "lucide-react";
 
 const RED  = "#DC143C";
 const DARK = "#0A0A0A";
@@ -140,10 +141,10 @@ export default function ContactPage() {
       {/* ── INFO STRIP ── */}
       <div className="ct-strip">
         {[
-          { icon: "📞", label: "Phone", val: "+27 10 123 4567" },
-          { icon: "✉️", label: "Email", val: "support@kasifix.com" },
-          { icon: "📍", label: "Location", val: "Johannesburg, South Africa" },
-          { icon: "🕐", label: "Support Hours", val: "Mon–Fri  8am – 6pm" },
+          { icon: <Phone size={20}/>, label: "Phone", val: "+27 10 123 4567" },
+          { icon: <Mail size={20}/>, label: "Email", val: "support@kasifix.com" },
+          { icon: <MapPin size={20}/>, label: "Location", val: "Johannesburg, South Africa" },
+          { icon: <Clock size={20}/>, label: "Support Hours", val: "Mon–Fri  8am – 6pm" },
         ].map(item => (
           <div key={item.label} className="ct-strip-item">
             <div className="ct-strip-icon">{item.icon}</div>
@@ -168,23 +169,23 @@ export default function ContactPage() {
 
           {[
             {
-              icon: "📞",
+              icon: <Phone size={22} color="#fff"/>,
               title: "Call Us",
               lines: ["+27 10 123 4567", "Mon–Fri  8am – 6pm SAST"],
             },
             {
-              icon: "✉️",
+              icon: <Mail size={22} color="#fff"/>,
               title: "Email Support",
               lines: ["support@kasifix.com", "vendors@kasifix.com"],
               link: "mailto:support@kasifix.com",
             },
             {
-              icon: "📍",
+              icon: <MapPin size={22} color="#fff"/>,
               title: "Office Address",
               lines: ["1 Sandton Drive, Sandton", "Johannesburg, 2196"],
             },
             {
-              icon: "💬",
+              icon: <MessageCircle size={22} color="#fff"/>,
               title: "WhatsApp Business",
               lines: ["Chat with us on WhatsApp", "+27 82 000 0000"],
               link: "https://wa.me/27820000000",
@@ -213,8 +214,8 @@ export default function ContactPage() {
               Follow Us
             </div>
             <div className="ct-social">
-              {["🐦", "📘", "📸", "▶️"].map((icon, i) => (
-                <a key={i} href="#" className="ct-soc-btn">{icon}</a>
+              {(["X","FB","IG","YT"] as const).map((label, i) => (
+                <a key={i} href="#" className="ct-soc-btn" style={{fontSize:12,fontWeight:800,color:"#374151"}}>{label}</a>
               ))}
             </div>
           </div>
@@ -224,7 +225,7 @@ export default function ContactPage() {
         <div className="ct-form-card">
           {status === "sent" ? (
             <div className="ct-sent">
-              <div className="ct-sent-icon">✅</div>
+              <div className="ct-sent-icon" style={{display:"flex",justifyContent:"center"}}><CheckCircle2 size={56} color="#16a34a"/></div>
               <h3>Message Received!</h3>
               <p>
                 Thanks for reaching out. Our support team will get back to you at{" "}

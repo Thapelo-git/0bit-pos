@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "../../../src/shared/context/CartContext";
+import { ClipboardList, X, Shield, CheckCircle2, RefreshCw } from "lucide-react";
 
 const RED = "#DC143C";
 
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=200&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=200&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=200&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=200&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=200&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=200&auto=format&fit=crop",
 };
@@ -32,7 +33,7 @@ export default function CartPage() {
           .empty-btn  { background:${RED}; color:#fff; padding:14px 32px; border-radius:8px; font-weight:800; font-size:15px; text-decoration:none; }
         `}</style>
         <div className="empty-cart">
-          <div className="empty-icon">📋</div>
+          <div className="empty-icon"><ClipboardList size={72} color="#9ca3af"/></div>
           <h1 className="empty-title">Your booking is empty</h1>
           <p className="empty-sub">Browse our services and add them to your booking — no account needed to get started.</p>
           <Link href="/services" className="empty-btn">Browse Services</Link>
@@ -95,7 +96,7 @@ export default function CartPage() {
         <h1 className="cart-title">My Booking</h1>
         <p className="cart-sub">{items.length} service{items.length !== 1 ? "s" : ""} in your booking</p>
 
-        <button className="clear-btn" onClick={clearCart}>✕ Clear all</button>
+        <button className="clear-btn" onClick={clearCart} style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><X size={12}/>Clear all</button>
 
         <div className="cart-layout">
           {/* Items */}
@@ -120,7 +121,7 @@ export default function CartPage() {
                         <span className="qty-val">{item.quantity}</span>
                         <button className="qty-btn" onClick={() => updateQty(item.id, item.quantity + 1)}>+</button>
                       </div>
-                      <button className="remove-btn" onClick={() => removeItem(item.id)}>✕ Remove</button>
+                      <button className="remove-btn" onClick={() => removeItem(item.id)} style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><X size={11}/>Remove</button>
                     </div>
                   </div>
                   {item.quantity > 1 && (
@@ -169,9 +170,9 @@ export default function CartPage() {
             {/* Trust strip */}
             <div className="cart-trust">
               {[
-                { icon: "🛡", text: "Secure checkout" },
-                { icon: "✅", text: "Verified providers" },
-                { icon: "🔄", text: "Free rebooking" },
+                { icon: <Shield size={18}/>, text: "Secure checkout" },
+                { icon: <CheckCircle2 size={18}/>, text: "Verified providers" },
+                { icon: <RefreshCw size={18}/>, text: "Free rebooking" },
               ].map(t => (
                 <div key={t.text} className="ct-item">
                   <span className="ct-icon">{t.icon}</span>

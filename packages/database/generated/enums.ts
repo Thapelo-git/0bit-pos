@@ -32,6 +32,14 @@ export const BookingStatus = {
 export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus]
 
 
+export const PayoutStatus = {
+  PENDING: 'PENDING',
+  PAID: 'PAID'
+} as const
+
+export type PayoutStatus = (typeof PayoutStatus)[keyof typeof PayoutStatus]
+
+
 export const AccountStatus = {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',

@@ -3,6 +3,7 @@ import {
   adminDashboard, listUsers, inviteUser, updateUserStatus, updateUserRole,
   inviteManager, listManagers, adminActivity, listPendingVendors, approveVendor,
   listAllVendors, updateVendorStatus, listAllServices, approveService, rejectService, verifyVendor,
+  getPendingPayouts, markPayoutPaid, getPayoutsHistory,
 } from "./admin.controller.js";
 import { protect }   from "../../middleware/auth.middleware.js";
 import { authorize } from "../../middleware/role.middleware.js";
@@ -34,5 +35,10 @@ router.post("/managers/invite",   inviteManager);
 router.get("/services",                listAllServices);
 router.patch("/services/:id/approve",  approveService);
 router.patch("/services/:id/reject",   rejectService);
+
+// Payouts
+router.get("/payouts",                 getPendingPayouts);
+router.get("/payouts/history",         getPayoutsHistory);
+router.patch("/payouts/:id/mark-paid", markPayoutPaid);
 
 export default router;

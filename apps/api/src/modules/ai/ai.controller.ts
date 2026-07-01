@@ -16,7 +16,7 @@ const KEYWORD_MAP: Record<string, string[]> = {
     "cardio", "run", "boxing", "crossfit", "stretch", "tone", "lose weight",
     "get fit", "athletic",
   ],
-  "Personal Services": [
+  "Beauty & Grooming": [
     "hair", "barber", "nails", "beauty", "massage", "spa", "salon",
     "wax", "facial", "makeup", "grooming", "eyebrow", "lash", "skincare",
     "pedicure", "manicure",
@@ -58,7 +58,7 @@ function extractKeywords(query: string): string[] {
 function generateInterpretation(query: string, category: string): string {
   if (category === "Fitness & Wellness") return "Looking for fitness or wellness services";
   if (category === "Home Cleaning")      return "Looking for home cleaning services";
-  if (category === "Personal Services")  return "Looking for personal care services";
+  if (category === "Beauty & Grooming")  return "Looking for personal care services";
   if (category === "Home Maintenance & Trades") return "Looking for home repair or maintenance";
   if (category === "Professional Training & Coaching") return "Looking for training or coaching";
   return `Searching for: ${query.slice(0, 40)}`;
@@ -151,7 +151,7 @@ Do NOT start with the service name. Do not use markdown or quotes. Return only t
   const templates: Record<string, string> = {
     "Home Cleaning":   `Our professional cleaning team delivers thorough, reliable service tailored to your home. Using quality products and proven methods, we leave every room spotless and fresh. Book with confidence — satisfaction guaranteed.`,
     "Fitness & Wellness": `Transform your health with personalised sessions designed around your goals and fitness level. Our certified professional brings expertise, motivation, and a structured plan to every session. Start your journey to a healthier, stronger you.`,
-    "Personal Services": `Experience premium personal care in a professional, welcoming environment. Our skilled specialist uses quality products and proven techniques to deliver results you'll love. Treat yourself to the care you deserve.`,
+    "Beauty & Grooming": `Experience premium personal care in a professional, welcoming environment. Our skilled specialist uses quality products and proven techniques to deliver results you'll love. Treat yourself to the care you deserve.`,
     "Home Maintenance & Trades": `Get reliable, skilled workmanship for all your home repair and maintenance needs. Our experienced tradesperson arrives on time, works neatly, and ensures every job is completed to a high standard. No job too big or too small.`,
     "Professional Training & Coaching": `Unlock your potential with expert-led, personalised coaching sessions. Our experienced professional tailors every lesson to your pace and goals, making learning effective and enjoyable. Invest in your growth today.`,
   };

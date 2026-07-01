@@ -47,6 +47,7 @@ export type ServiceMinAggregateOutputType = {
   isActive: boolean | null
   isDeal: boolean | null
   originalPrice: number | null
+  dealExpiresAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -62,6 +63,7 @@ export type ServiceMaxAggregateOutputType = {
   isActive: boolean | null
   isDeal: boolean | null
   originalPrice: number | null
+  dealExpiresAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -77,6 +79,7 @@ export type ServiceCountAggregateOutputType = {
   isActive: number
   isDeal: number
   originalPrice: number
+  dealExpiresAt: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -104,6 +107,7 @@ export type ServiceMinAggregateInputType = {
   isActive?: true
   isDeal?: true
   originalPrice?: true
+  dealExpiresAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -119,6 +123,7 @@ export type ServiceMaxAggregateInputType = {
   isActive?: true
   isDeal?: true
   originalPrice?: true
+  dealExpiresAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -134,6 +139,7 @@ export type ServiceCountAggregateInputType = {
   isActive?: true
   isDeal?: true
   originalPrice?: true
+  dealExpiresAt?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -236,6 +242,7 @@ export type ServiceGroupByOutputType = {
   isActive: boolean
   isDeal: boolean
   originalPrice: number | null
+  dealExpiresAt: Date | null
   createdAt: Date
   updatedAt: Date
   _count: ServiceCountAggregateOutputType | null
@@ -274,6 +281,7 @@ export type ServiceWhereInput = {
   isActive?: Prisma.BoolFilter<"Service"> | boolean
   isDeal?: Prisma.BoolFilter<"Service"> | boolean
   originalPrice?: Prisma.FloatNullableFilter<"Service"> | number | null
+  dealExpiresAt?: Prisma.DateTimeNullableFilter<"Service"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Service"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Service"> | Date | string
   vendorProfile?: Prisma.XOR<Prisma.VendorProfileScalarRelationFilter, Prisma.VendorProfileWhereInput>
@@ -292,6 +300,7 @@ export type ServiceOrderByWithRelationInput = {
   isActive?: Prisma.SortOrder
   isDeal?: Prisma.SortOrder
   originalPrice?: Prisma.SortOrderInput | Prisma.SortOrder
+  dealExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   vendorProfile?: Prisma.VendorProfileOrderByWithRelationInput
@@ -313,6 +322,7 @@ export type ServiceWhereUniqueInput = Prisma.AtLeast<{
   isActive?: Prisma.BoolFilter<"Service"> | boolean
   isDeal?: Prisma.BoolFilter<"Service"> | boolean
   originalPrice?: Prisma.FloatNullableFilter<"Service"> | number | null
+  dealExpiresAt?: Prisma.DateTimeNullableFilter<"Service"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Service"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Service"> | Date | string
   vendorProfile?: Prisma.XOR<Prisma.VendorProfileScalarRelationFilter, Prisma.VendorProfileWhereInput>
@@ -331,6 +341,7 @@ export type ServiceOrderByWithAggregationInput = {
   isActive?: Prisma.SortOrder
   isDeal?: Prisma.SortOrder
   originalPrice?: Prisma.SortOrderInput | Prisma.SortOrder
+  dealExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.ServiceCountOrderByAggregateInput
@@ -354,6 +365,7 @@ export type ServiceScalarWhereWithAggregatesInput = {
   isActive?: Prisma.BoolWithAggregatesFilter<"Service"> | boolean
   isDeal?: Prisma.BoolWithAggregatesFilter<"Service"> | boolean
   originalPrice?: Prisma.FloatNullableWithAggregatesFilter<"Service"> | number | null
+  dealExpiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Service"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Service"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Service"> | Date | string
 }
@@ -368,6 +380,7 @@ export type ServiceCreateInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   vendorProfile: Prisma.VendorProfileCreateNestedOneWithoutServicesInput
@@ -386,6 +399,7 @@ export type ServiceUncheckedCreateInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   bookings?: Prisma.BookingUncheckedCreateNestedManyWithoutServiceInput
@@ -402,6 +416,7 @@ export type ServiceUpdateInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   vendorProfile?: Prisma.VendorProfileUpdateOneRequiredWithoutServicesNestedInput
@@ -420,6 +435,7 @@ export type ServiceUncheckedUpdateInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   bookings?: Prisma.BookingUncheckedUpdateManyWithoutServiceNestedInput
@@ -437,6 +453,7 @@ export type ServiceCreateManyInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -451,6 +468,7 @@ export type ServiceUpdateManyMutationInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -466,6 +484,7 @@ export type ServiceUncheckedUpdateManyInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -491,6 +510,7 @@ export type ServiceCountOrderByAggregateInput = {
   isActive?: Prisma.SortOrder
   isDeal?: Prisma.SortOrder
   originalPrice?: Prisma.SortOrder
+  dealExpiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -511,6 +531,7 @@ export type ServiceMaxOrderByAggregateInput = {
   isActive?: Prisma.SortOrder
   isDeal?: Prisma.SortOrder
   originalPrice?: Prisma.SortOrder
+  dealExpiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -526,6 +547,7 @@ export type ServiceMinOrderByAggregateInput = {
   isActive?: Prisma.SortOrder
   isDeal?: Prisma.SortOrder
   originalPrice?: Prisma.SortOrder
+  dealExpiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -628,6 +650,7 @@ export type ServiceCreateWithoutVendorProfileInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   bookings?: Prisma.BookingCreateNestedManyWithoutServiceInput
@@ -644,6 +667,7 @@ export type ServiceUncheckedCreateWithoutVendorProfileInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   bookings?: Prisma.BookingUncheckedCreateNestedManyWithoutServiceInput
@@ -690,6 +714,7 @@ export type ServiceScalarWhereInput = {
   isActive?: Prisma.BoolFilter<"Service"> | boolean
   isDeal?: Prisma.BoolFilter<"Service"> | boolean
   originalPrice?: Prisma.FloatNullableFilter<"Service"> | number | null
+  dealExpiresAt?: Prisma.DateTimeNullableFilter<"Service"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Service"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Service"> | Date | string
 }
@@ -704,6 +729,7 @@ export type ServiceCreateWithoutReviewsInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   vendorProfile: Prisma.VendorProfileCreateNestedOneWithoutServicesInput
@@ -721,6 +747,7 @@ export type ServiceUncheckedCreateWithoutReviewsInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   bookings?: Prisma.BookingUncheckedCreateNestedManyWithoutServiceInput
@@ -752,6 +779,7 @@ export type ServiceUpdateWithoutReviewsInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   vendorProfile?: Prisma.VendorProfileUpdateOneRequiredWithoutServicesNestedInput
@@ -769,6 +797,7 @@ export type ServiceUncheckedUpdateWithoutReviewsInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   bookings?: Prisma.BookingUncheckedUpdateManyWithoutServiceNestedInput
@@ -784,6 +813,7 @@ export type ServiceCreateWithoutBookingsInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   vendorProfile: Prisma.VendorProfileCreateNestedOneWithoutServicesInput
@@ -801,6 +831,7 @@ export type ServiceUncheckedCreateWithoutBookingsInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   reviews?: Prisma.ReviewUncheckedCreateNestedManyWithoutServiceInput
@@ -832,6 +863,7 @@ export type ServiceUpdateWithoutBookingsInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   vendorProfile?: Prisma.VendorProfileUpdateOneRequiredWithoutServicesNestedInput
@@ -849,6 +881,7 @@ export type ServiceUncheckedUpdateWithoutBookingsInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reviews?: Prisma.ReviewUncheckedUpdateManyWithoutServiceNestedInput
@@ -864,6 +897,7 @@ export type ServiceCreateManyVendorProfileInput = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: number | null
+  dealExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -878,6 +912,7 @@ export type ServiceUpdateWithoutVendorProfileInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   bookings?: Prisma.BookingUpdateManyWithoutServiceNestedInput
@@ -894,6 +929,7 @@ export type ServiceUncheckedUpdateWithoutVendorProfileInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   bookings?: Prisma.BookingUncheckedUpdateManyWithoutServiceNestedInput
@@ -910,6 +946,7 @@ export type ServiceUncheckedUpdateManyWithoutVendorProfileInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isDeal?: Prisma.BoolFieldUpdateOperationsInput | boolean
   originalPrice?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  dealExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -965,6 +1002,7 @@ export type ServiceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: boolean
+  dealExpiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   vendorProfile?: boolean | Prisma.VendorProfileDefaultArgs<ExtArgs>
@@ -984,6 +1022,7 @@ export type ServiceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: boolean
+  dealExpiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   vendorProfile?: boolean | Prisma.VendorProfileDefaultArgs<ExtArgs>
@@ -1000,6 +1039,7 @@ export type ServiceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: boolean
+  dealExpiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   vendorProfile?: boolean | Prisma.VendorProfileDefaultArgs<ExtArgs>
@@ -1016,11 +1056,12 @@ export type ServiceSelectScalar = {
   isActive?: boolean
   isDeal?: boolean
   originalPrice?: boolean
+  dealExpiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type ServiceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "vendorProfileId" | "name" | "description" | "price" | "category" | "imageUrl" | "isActive" | "isDeal" | "originalPrice" | "createdAt" | "updatedAt", ExtArgs["result"]["service"]>
+export type ServiceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "vendorProfileId" | "name" | "description" | "price" | "category" | "imageUrl" | "isActive" | "isDeal" | "originalPrice" | "dealExpiresAt" | "createdAt" | "updatedAt", ExtArgs["result"]["service"]>
 export type ServiceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   vendorProfile?: boolean | Prisma.VendorProfileDefaultArgs<ExtArgs>
   bookings?: boolean | Prisma.Service$bookingsArgs<ExtArgs>
@@ -1052,6 +1093,7 @@ export type $ServicePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     isActive: boolean
     isDeal: boolean
     originalPrice: number | null
+    dealExpiresAt: Date | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["service"]>
@@ -1490,6 +1532,7 @@ export interface ServiceFieldRefs {
   readonly isActive: Prisma.FieldRef<"Service", 'Boolean'>
   readonly isDeal: Prisma.FieldRef<"Service", 'Boolean'>
   readonly originalPrice: Prisma.FieldRef<"Service", 'Float'>
+  readonly dealExpiresAt: Prisma.FieldRef<"Service", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"Service", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Service", 'DateTime'>
 }

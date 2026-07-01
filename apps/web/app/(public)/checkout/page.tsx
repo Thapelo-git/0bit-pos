@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "../../../src/shared/context/CartContext";
+import { Clock, PartyPopper, Mail, ShoppingCart, Banknote, CreditCard, Wallet, Lock, Shield, CheckCircle2, RefreshCw } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -13,15 +14,15 @@ const PROVINCES = [
 ];
 
 const PAYMENT_METHODS = [
-  { id: "EFT",  label: "EFT / Bank Transfer", icon: "🏦", desc: "Pay via internet banking after booking" },
-  { id: "CARD", label: "Credit / Debit Card",  icon: "💳", desc: "Visa, Mastercard — secure checkout" },
-  { id: "CASH", label: "Cash on Delivery",      icon: "💵", desc: "Pay the provider directly on the day" },
+  { id: "EFT",  label: "EFT / Bank Transfer", icon: <Banknote size={24}/>, desc: "Pay via internet banking after booking" },
+  { id: "CARD", label: "Credit / Debit Card",  icon: <CreditCard size={24}/>, desc: "Visa, Mastercard — secure checkout" },
+  { id: "CASH", label: "Cash on Delivery",      icon: <Wallet size={24}/>, desc: "Pay the provider directly on the day" },
 ];
 
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=120&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=120&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=120&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=120&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=120&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=120&auto=format&fit=crop",
 };
@@ -53,15 +54,27 @@ export default function CheckoutPage() {
   const [cardCvv,    setCardCvv]    = useState("");
   const [saveAddr,   setSaveAddr]   = useState(false);
 
-  const [placing,   setPlacing]   = useState(false);
-  const [error,     setError]     = useState("");
-  const [confirmed, setConfirmed] = useState<{ bookings: any[]; total: number } | null>(null);
+  const [placing,    setPlacing]    = useState(false);
+  const [error,      setError]      = useState("");
+  const [confirmed,  setConfirmed]  = useState<{ bookings: any[]; total: number } | null>(null);
 
-  const ADDR_KEY    = "kasifix_saved_address";
+  interface SavedAddr { id: string; label: string; phone: string; address: string; city: string; province: string; postalCode: string; isDefault: boolean; }
+  const [savedAddrs, setSavedAddrs] = useState<SavedAddr[]>([]);
+  const [addrLabel,  setAddrLabel]  = useState("Home");
+
+  const ADDRS_KEY   = "kasifix_addrs";
   const SERVICE_FEE = items.length > 0 ? 30 : 0;
   const grandTotal  = total + SERVICE_FEE;
 
-  // Check auth on mount + load saved address
+  const fillFromAddr = (a: SavedAddr) => {
+    setPhone(a.phone);
+    setAddress(a.address);
+    setCity(a.city);
+    setProvince(a.province);
+    setPostalCode(a.postalCode);
+  };
+
+  // Check auth on mount + load saved addresses
   useEffect(() => {
     fetch(`${API}/auth/me`, { credentials: "include" })
       .then(r => r.json())
@@ -70,16 +83,13 @@ export default function CheckoutPage() {
           const u = j.data.user;
           setUser(u);
           setFullName(u.displayName || `${u.firstName || ""}`.trim() || "");
-          // Pre-fill saved address if exists
           try {
-            const saved = localStorage.getItem(`${ADDR_KEY}_${u.email}`);
-            if (saved) {
-              const a = JSON.parse(saved);
-              if (a.phone)      setPhone(a.phone);
-              if (a.address)    setAddress(a.address);
-              if (a.city)       setCity(a.city);
-              if (a.province)   setProvince(a.province);
-              if (a.postalCode) setPostalCode(a.postalCode);
+            const raw = localStorage.getItem(`${ADDRS_KEY}_${u.email}`);
+            if (raw) {
+              const addrs: SavedAddr[] = JSON.parse(raw);
+              setSavedAddrs(addrs);
+              const def = addrs.find(a => a.isDefault) || addrs[0];
+              if (def) fillFromAddr(def);
             }
           } catch {}
         } else {
@@ -88,6 +98,7 @@ export default function CheckoutPage() {
       })
       .catch(() => router.push("/login?redirect=/checkout"))
       .finally(() => setAuthLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,7 +119,12 @@ export default function CheckoutPage() {
 
     // Save address for future use
     if (saveAddr && user) {
-      try { localStorage.setItem(`${ADDR_KEY}_${user.email}`, JSON.stringify({ phone, address, city, province, postalCode })); } catch {}
+      try {
+        const newEntry = { id: Date.now().toString(36), label: addrLabel || "Home", phone: phone.trim(), address: address.trim(), city: city.trim(), province, postalCode: postalCode.trim(), isDefault: savedAddrs.length === 0 };
+        const updated  = [...savedAddrs.map(a => ({ ...a, isDefault: savedAddrs.length === 0 ? false : a.isDefault })), newEntry];
+        localStorage.setItem(`${ADDRS_KEY}_${user.email}`, JSON.stringify(updated));
+        setSavedAddrs(updated);
+      } catch {}
     }
 
     const fullAddress = `${address.trim()}, ${city.trim()}, ${province}, ${postalCode.trim()}, South Africa`;
@@ -143,7 +159,7 @@ export default function CheckoutPage() {
   // ── Loading state ────────────────────────────────────────────────────────────
   if (authLoading) return (
     <div style={{ padding: "80px 20px", textAlign: "center", fontFamily: "sans-serif", color: "#71717A" }}>
-      <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>Checking your account…
+      <div style={{ marginBottom: "12px", display:"flex", justifyContent:"center" }}><Clock size={32}/></div>Checking your account…
     </div>
   );
 
@@ -163,7 +179,7 @@ export default function CheckoutPage() {
           .conf-btn     { padding:13px 28px; border-radius:8px; font-weight:800; font-size:14px; text-decoration:none; display:inline-block; }
         `}</style>
         <div className="confirm-wrap">
-          <div className="confirm-icon">🎉</div>
+          <div className="confirm-icon" style={{display:"flex",justifyContent:"center"}}><PartyPopper size={72} color="#f59e0b"/></div>
           <h1 className="confirm-h1">Order Confirmed!</h1>
           <p className="confirm-sub">
             Thank you{user?.firstName ? `, ${user.firstName}` : ""}! Your{" "}
@@ -188,8 +204,8 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: 12, padding: "14px 20px", fontSize: 14, color: "#065f46", fontWeight: 600, marginBottom: 24 }}>
-            📧 A confirmation has been sent to <strong>{user?.email}</strong>
+          <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: 12, padding: "14px 20px", fontSize: 14, color: "#065f46", fontWeight: 600, marginBottom: 24, display:"flex", alignItems:"center", gap:8 }}>
+            <Mail size={16}/>A confirmation has been sent to <strong>{user?.email}</strong>
           </div>
 
           <div className="conf-actions">
@@ -209,7 +225,7 @@ export default function CheckoutPage() {
   if (items.length === 0) {
     return (
       <div style={{ padding: "80px 20px", textAlign: "center", fontFamily: "sans-serif" }}>
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>🛒</div>
+        <div style={{ marginBottom: "16px", display:"flex", justifyContent:"center" }}><ShoppingCart size={48} color="#9ca3af"/></div>
         <h2 style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Your cart is empty</h2>
         <p style={{ color: "#71717A", marginBottom: 24 }}>Add services to your cart before checking out.</p>
         <Link href="/services" style={{ background: RED, color: "#fff", padding: "13px 28px", borderRadius: 8, fontWeight: 800, textDecoration: "none" }}>
@@ -258,10 +274,21 @@ export default function CheckoutPage() {
         .card-fields   { margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:16px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0; }
         .card-field    { display:flex; flex-direction:column; gap:5px; }
         .card-field.full { grid-column:1/-1; }
+        /* Saved addresses picker */
+        .saved-addrs    { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+        .saved-addr-card { padding:10px 14px; border:1.5px solid #e5e7eb; border-radius:10px; cursor:pointer; min-width:140px; transition:border-color .15s,background .15s; background:#fff; }
+        .saved-addr-card:hover { border-color:${RED}; }
+        .saved-addr-card.active { border-color:${RED}; background:#fff5f5; }
+        .sac-label      { font-size:12px; font-weight:800; color:#0A0A0A; margin-bottom:3px; display:flex; align-items:center; gap:5px; }
+        .sac-detail     { font-size:11px; color:#71717A; line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+        .sac-default    { font-size:10px; font-weight:700; background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:8px; }
         /* Save address */
-        .save-addr     { display:flex; align-items:center; gap:10px; padding:14px 16px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; margin-top:14px; cursor:pointer; }
-        .save-addr input{ cursor:pointer; width:16px; height:16px; accent-color:#16a34a; flex-shrink:0; }
+        .save-addr      { display:flex; align-items:flex-start; gap:10px; padding:14px 16px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; margin-top:14px; cursor:pointer; flex-wrap:wrap; }
+        .save-addr input { cursor:pointer; width:16px; height:16px; accent-color:#16a34a; flex-shrink:0; margin-top:2px; }
         .save-addr-txt  { font-size:13px; font-weight:600; color:#15803d; }
+        .addr-label-sel { display:flex; gap:8px; margin-top:8px; width:100%; }
+        .addr-label-btn { padding:5px 14px; border-radius:20px; border:1.5px solid #bbf7d0; background:#fff; font-size:12px; font-weight:700; cursor:pointer; color:#15803d; transition:background .15s; }
+        .addr-label-btn.sel { background:#15803d; color:#fff; border-color:#15803d; }
 
         /* Error */
         .co-error      { background:#fee2e2; border:1px solid #fca5a5; color:#991b1b; padding:12px 16px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:16px; }
@@ -325,6 +352,29 @@ export default function CheckoutPage() {
                 Service Address
                 <span style={{ fontSize: 12, color: "#71717A", fontWeight: 400 }}>Where must the provider come to?</span>
               </div>
+
+              {savedAddrs.length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".4px" }}>Saved Addresses</div>
+                  <div className="saved-addrs">
+                    {savedAddrs.map(a => {
+                      const active = a.address === address && a.city === city && a.province === province;
+                      return (
+                        <div key={a.id} className={`saved-addr-card${active ? " active" : ""}`} onClick={() => fillFromAddr(a)}>
+                          <div className="sac-label">
+                            {a.label}
+                            {a.isDefault && <span className="sac-default">Default</span>}
+                          </div>
+                          <div className="sac-detail">{a.address}</div>
+                          <div className="sac-detail">{a.city}, {a.province}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 12 }}>or enter a different address below</div>
+                </div>
+              )}
+
               <div className="co-grid">
                 <div className="co-field full">
                   <label className="co-label">Street Address *</label>
@@ -367,7 +417,7 @@ export default function CheckoutPage() {
                       <div className="pay-opt-label">{pm.label}</div>
                       <div className="pay-opt-desc">{pm.desc}</div>
                     </div>
-                    {payment === pm.id && <span style={{ marginLeft: "auto", color: RED, fontSize: 18, fontWeight: 900 }}>✓</span>}
+                    {payment === pm.id && <CheckCircle2 size={18} color={RED} style={{ marginLeft: "auto", flexShrink: 0 }}/>}
                   </label>
                 ))}
               </div>
@@ -413,7 +463,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="card-field full" style={{ marginTop: 4 }}>
                     <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", display: "flex", alignItems: "center", gap: 6 }}>
-                      🔒 Your card details are encrypted and secure. Live card processing powered by Yoco / Peach Payments (integration required for production).
+                      <Lock size={11}/>Your card details are encrypted and secure. Live card processing powered by Yoco / Peach Payments (integration required for production).
                     </p>
                   </div>
                 </div>
@@ -421,10 +471,23 @@ export default function CheckoutPage() {
             </div>
 
             {/* Save address */}
-            <label className="save-addr">
-              <input type="checkbox" checked={saveAddr} onChange={e => setSaveAddr(e.target.checked)} />
-              <span className="save-addr-txt">Save my address &amp; contact details for next time</span>
-            </label>
+            <div className="save-addr">
+              <input type="checkbox" id="save-addr-chk" checked={saveAddr} onChange={e => setSaveAddr(e.target.checked)} />
+              <div style={{ flex: 1 }}>
+                <label htmlFor="save-addr-chk" className="save-addr-txt" style={{ cursor: "pointer" }}>
+                  Save this address for next time
+                </label>
+                {saveAddr && (
+                  <div className="addr-label-sel">
+                    {["Home", "Work", "Other"].map(lbl => (
+                      <button key={lbl} type="button" className={`addr-label-btn${addrLabel === lbl ? " sel" : ""}`} onClick={() => setAddrLabel(lbl)}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Mobile place order */}
             <button type="submit" className="place-btn" disabled={placing} style={{ display: "none" }} id="mobile-place-btn">
@@ -471,11 +534,11 @@ export default function CheckoutPage() {
 
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
                 {[
-                  "🛡 256-bit secure checkout",
-                  "✅ All providers are verified",
-                  "🔄 Free rebooking guarantee",
+                  { icon: <Shield size={13}/>, text: "256-bit secure checkout" },
+                  { icon: <CheckCircle2 size={13}/>, text: "All providers are verified" },
+                  { icon: <RefreshCw size={13}/>, text: "Free rebooking guarantee" },
                 ].map(t => (
-                  <div key={t} style={{ fontSize: 12, color: "#374151", display: "flex", alignItems: "center", gap: 6 }}>{t}</div>
+                  <div key={t.text} style={{ fontSize: 12, color: "#374151", display: "flex", alignItems: "center", gap: 6 }}>{t.icon}{t.text}</div>
                 ))}
               </div>
             </div>

@@ -1,15 +1,16 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { CartProvider, useCart } from "../../src/shared/context/CartContext";
+import { Store, Settings, ClipboardList, Heart, X, ShoppingCart, Search, Loader2, Bell, CheckCheck, Trash2 } from "lucide-react";
 
 const RED = "#DC143C";
 
 const CATEGORIES = [
   "Home Cleaning",
   "Fitness & Wellness",
-  "Personal Services",
+  "Beauty & Grooming",
   "Home Maintenance & Trades",
   "Professional Training & Coaching",
   "Other Local Services",
@@ -24,6 +25,138 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+
+type Notif = { id: string; title: string; body: string; read: boolean; link?: string | null; createdAt: string };
+
+function NotificationBell() {
+  const [open,        setOpen]        = useState(false);
+  const [notifs,      setNotifs]      = useState<Notif[]>([]);
+  const [unread,      setUnread]      = useState(0);
+  const [loading,     setLoading]     = useState(false);
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifs = async () => {
+    try {
+      const r = await fetch(`${API}/notifications`, { credentials: "include" });
+      if (!r.ok) return;
+      const j = await r.json();
+      setNotifs(j.data?.notifications ?? []);
+      setUnread(j.data?.unreadCount   ?? 0);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchNotifs();
+    const id = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const markAllRead = async () => {
+    setLoading(true);
+    try {
+      await fetch(`${API}/notifications/read-all`, { method: "PATCH", credentials: "include" });
+      setNotifs(ns => ns.map(n => ({ ...n, read: true })));
+      setUnread(0);
+    } catch {} finally { setLoading(false); }
+  };
+
+  const markOne = async (id: string) => {
+    await fetch(`${API}/notifications/${id}/read`, { method: "PATCH", credentials: "include" }).catch(() => {});
+    setNotifs(ns => ns.map(n => n.id === id ? { ...n, read: true } : n));
+    setUnread(u => Math.max(0, u - 1));
+  };
+
+  const deleteOne = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await fetch(`${API}/notifications/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+    const removed = notifs.find(n => n.id === id);
+    setNotifs(ns => ns.filter(n => n.id !== id));
+    if (removed && !removed.read) setUnread(u => Math.max(0, u - 1));
+  };
+
+  const timeAgo = (iso: string) => {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)   return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
+
+  return (
+    <div ref={dropRef} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="pub-icon-btn"
+        title="Notifications"
+        aria-label="Notifications"
+      >
+        <Bell size={22}/>
+        {unread > 0 && (
+          <span className="pub-icon-badge">{unread > 9 ? "9+" : unread}</span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", right: 0, width: 340,
+          background: "#fff", border: "1.5px solid #eaeaea", borderRadius: 12,
+          boxShadow: "0 8px 32px rgba(0,0,0,.12)", zIndex: 400, overflow: "hidden",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px 10px", borderBottom: "1px solid #eaeaea" }}>
+            <span style={{ fontWeight: 800, fontSize: 14 }}>Notifications</span>
+            {unread > 0 && (
+              <button onClick={markAllRead} disabled={loading} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: RED, fontWeight: 700 }}>
+                <CheckCheck size={14}/> Mark all read
+              </button>
+            )}
+          </div>
+
+          <div style={{ maxHeight: 380, overflowY: "auto" }}>
+            {notifs.length === 0 ? (
+              <div style={{ padding: "32px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+                No notifications yet
+              </div>
+            ) : notifs.map(n => (
+              <div
+                key={n.id}
+                onClick={() => { markOne(n.id); if (n.link) { setOpen(false); window.location.href = n.link; } }}
+                style={{
+                  display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 16px",
+                  borderBottom: "1px solid #f3f4f6", cursor: n.link ? "pointer" : "default",
+                  background: n.read ? "#fff" : "#fff8f8",
+                  transition: "background .15s",
+                }}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: n.read ? "transparent" : RED, marginTop: 6, flexShrink: 0 }}/>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: n.read ? 600 : 800, fontSize: 13, color: "#111", marginBottom: 2 }}>{n.title}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>{n.body}</div>
+                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>{timeAgo(n.createdAt)}</div>
+                </div>
+                <button
+                  onClick={e => deleteOne(n.id, e)}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "#d1d5db", padding: 2, borderRadius: 4, flexShrink: 0 }}
+                  title="Delete"
+                >
+                  <Trash2 size={13}/>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function PriceFilter() {
   const searchParams = useSearchParams();
@@ -83,8 +216,8 @@ function PriceFilter() {
       </div>
       <button className="sidebar-filter-btn" onClick={apply} style={{ marginTop: "10px" }}>Apply Filter</button>
       {hasFilter && (
-        <button onClick={clear} style={{ marginTop: "6px", width: "100%", padding: "7px", background: "none", border: "1px solid #eaeaea", borderRadius: "6px", fontSize: "12px", color: "#71717A", cursor: "pointer", fontWeight: 600 }}>
-          ✕ Clear Price Filter
+        <button onClick={clear} style={{ marginTop: "6px", width: "100%", padding: "7px", background: "none", border: "1px solid #eaeaea", borderRadius: "6px", fontSize: "12px", color: "#71717A", cursor: "pointer", fontWeight: 600, display:"inline-flex", alignItems:"center", justifyContent:"center", gap:"4px" }}>
+          <X size={12}/> Clear Price Filter
         </button>
       )}
     </div>
@@ -94,6 +227,8 @@ function PriceFilter() {
 function PublicLayoutInner({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchValue, setSearchValue]       = useState("");
+  const [searching,   setSearching]         = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router   = useRouter();
   const pathname = usePathname();
   const { count: cartCount } = useCart();
@@ -133,11 +268,24 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
 
   const isHome = pathname === "/";
 
+  const doSearch = (value: string) => {
+    if (!value.trim()) return;
+    setSearching(true);
+    router.push(`/services?search=${encodeURIComponent(value.trim())}`);
+    setTimeout(() => setSearching(false), 600);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!value.trim()) return;
+    debounceRef.current = setTimeout(() => doSearch(value), 400);
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchValue.trim()) {
-      router.push(`/services?search=${encodeURIComponent(searchValue.trim())}`);
-    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    doSearch(searchValue);
   };
 
   return (
@@ -157,10 +305,11 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
         .pub-logo         { text-decoration:none; color:${RED}; font-size:26px; font-weight:900; letter-spacing:-1px; flex-shrink:0; line-height:1; }
 
         /* Search (desktop) */
-        .pub-search-form  { flex:1; max-width:500px; display:flex; align-items:center; }
-        .pub-search-input { flex:1; min-width:0; height:42px; padding:0 16px; border:1.5px solid #e5e7eb; border-right:none; border-radius:8px 0 0 8px; font-size:14px; outline:none; }
+        .pub-search-form  { flex:1; max-width:500px; display:flex; align-items:center; position:relative; }
+        .pub-search-icon  { position:absolute; left:12px; color:#9ca3af; pointer-events:none; display:flex; align-items:center; }
+        .pub-search-input { flex:1; min-width:0; height:42px; padding:0 16px 0 38px; border:1.5px solid #e5e7eb; border-right:none; border-radius:8px 0 0 8px; font-size:14px; outline:none; }
         .pub-search-input:focus { border-color:${RED}; }
-        .pub-search-btn   { height:42px; padding:0 18px; background:${RED}; color:#fff; border:none; border-radius:0 8px 8px 0; cursor:pointer; font-weight:700; font-size:14px; white-space:nowrap; flex-shrink:0; }
+        .pub-search-btn   { height:42px; padding:0 18px; background:${RED}; color:#fff; border:none; border-radius:0 8px 8px 0; cursor:pointer; font-weight:700; font-size:14px; white-space:nowrap; flex-shrink:0; display:flex; align-items:center; gap:6px; }
 
         /* Right actions */
         .header-actions   { display:flex; align-items:center; gap:4px; margin-left:auto; flex-shrink:0; }
@@ -236,6 +385,7 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
         @media (max-width:360px) {
           .mob-search button { padding:0 12px; font-size:13px; }
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div className="pub-layout">
@@ -252,14 +402,20 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
 
             {/* Desktop search */}
             <form className="pub-search-form" onSubmit={handleSearch}>
+              <span className="pub-search-icon">
+                {searching ? <Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} /> : <Search size={16} />}
+              </span>
               <input
                 className="pub-search-input"
                 type="text"
                 placeholder="Search for a service…"
                 value={searchValue}
-                onChange={e => setSearchValue(e.target.value)}
+                onChange={e => handleSearchChange(e.target.value)}
+                suppressHydrationWarning
               />
-              <button className="pub-search-btn" type="submit">Search</button>
+              <button className="pub-search-btn" type="submit">
+                <Search size={15} /> Search
+              </button>
             </form>
 
             {/* Right actions */}
@@ -285,21 +441,21 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
                       {/* Role-based portal link */}
                       {authUser.role === "VENDOR" && (
                         <Link href="/dashboard" className="acct-drop-item" onClick={() => setAcctDropOpen(false)}>
-                          🏪 Vendor Dashboard
+                          <Store size={16}/> Vendor Dashboard
                         </Link>
                       )}
                       {(authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN") && (
                         <Link href="/vendors" className="acct-drop-item" onClick={() => setAcctDropOpen(false)}>
-                          ⚙️ Admin Panel
+                          <Settings size={16}/> Admin Panel
                         </Link>
                       )}
                       {(authUser.role === "USER" || authUser.role === "CLIENT") && (
                         <>
                           <Link href="/my-orders" className="acct-drop-item" onClick={() => setAcctDropOpen(false)}>
-                            📋 My Orders
+                            <ClipboardList size={16}/> My Orders
                           </Link>
                           <Link href="/favorites" className="acct-drop-item" onClick={() => setAcctDropOpen(false)}>
-                            ♡ My Favourites
+                            <Heart size={16}/> My Favourites
                           </Link>
                         </>
                       )}
@@ -317,10 +473,12 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
                 </Link>
               )}
 
-              <Link href="/favorites" className="pub-icon-btn" title="Favourites">♡</Link>
+              {authUser && <NotificationBell />}
+
+              <Link href="/favorites" className="pub-icon-btn" title="Favourites"><Heart size={22}/></Link>
 
               <Link href="/cart" className="pub-icon-btn" title="My Booking">
-                📋{cartCount > 0 && <span className="pub-icon-badge">{cartCount}</span>}
+                <ShoppingCart size={22}/>{cartCount > 0 && <span className="pub-icon-badge">{cartCount}</span>}
               </Link>
 
               <button className="hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Open menu">☰</button>
@@ -334,9 +492,12 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
                 type="text"
                 placeholder="Search services…"
                 value={searchValue}
-                onChange={e => setSearchValue(e.target.value)}
+                onChange={e => handleSearchChange(e.target.value)}
+                suppressHydrationWarning
               />
-              <button type="submit">Search</button>
+              <button type="submit">
+                {searching ? <Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} /> : <Search size={16} />}
+              </button>
             </form>
           </div>
         </header>
@@ -377,7 +538,7 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
         <div className={`mobile-menu${mobileMenuOpen ? " open" : ""}`}>
           <div className="mobile-overlay" onClick={() => setMobileMenuOpen(false)} />
           <div className="mobile-drawer">
-            <button className="mobile-close" onClick={() => setMobileMenuOpen(false)}>✕</button>
+            <button className="mobile-close" onClick={() => setMobileMenuOpen(false)} style={{display:"flex",alignItems:"center",justifyContent:"center"}}><X size={22}/></button>
             <Link href="/" className="mobile-logo">kasiFix</Link>
 
             {/* Mobile search */}
@@ -387,11 +548,12 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
                   type="text"
                   placeholder="Search services..."
                   value={searchValue}
-                  onChange={e => setSearchValue(e.target.value)}
+                  onChange={e => handleSearchChange(e.target.value)}
                   style={{ flex: 1, padding: "10px 12px", border: "none", fontSize: "14px", outline: "none" }}
+                  suppressHydrationWarning
                 />
-                <button type="submit" style={{ background: RED, color: "#fff", border: "none", padding: "10px 14px", fontWeight: 700, cursor: "pointer" }}>
-                  →
+                <button type="submit" style={{ background: RED, color: "#fff", border: "none", padding: "10px 14px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center" }}>
+                  {searching ? <Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} /> : <Search size={16} />}
                 </button>
               </div>
             </form>
@@ -431,33 +593,33 @@ function PublicLayoutInner({ children }: { children: React.ReactNode }) {
                         background: "#fff", border: "1.5px solid #eaeaea", borderRadius: "8px",
                         fontWeight: 700, fontSize: 14, color: "#374151", textDecoration: "none"
                       }}>
-                        📋 My Orders
+                        <ClipboardList size={18}/> My Orders
                       </Link>
                       <Link href="/favorites" onClick={() => setMobileMenuOpen(false)} style={{
                         display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
                         background: "#fff", border: "1.5px solid #eaeaea", borderRadius: "8px",
                         fontWeight: 700, fontSize: 14, color: "#374151", textDecoration: "none"
                       }}>
-                        ♡ My Favourites
+                        <Heart size={18}/> My Favourites
                       </Link>
                     </>
                   )}
 
                   {authUser.role === "VENDOR" && (
                     <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} style={{
-                      display: "block", background: "#0A0A0A", color: "#fff", textAlign: "center",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#0A0A0A", color: "#fff", textAlign: "center",
                       padding: "13px", borderRadius: "8px", fontWeight: 700, textDecoration: "none"
                     }}>
-                      🏪 Vendor Dashboard
+                      <Store size={18}/> Vendor Dashboard
                     </Link>
                   )}
 
                   {(authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN") && (
                     <Link href="/vendors" onClick={() => setMobileMenuOpen(false)} style={{
-                      display: "block", background: "#0A0A0A", color: "#fff", textAlign: "center",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#0A0A0A", color: "#fff", textAlign: "center",
                       padding: "13px", borderRadius: "8px", fontWeight: 700, textDecoration: "none"
                     }}>
-                      ⚙️ Admin Panel
+                      <Settings size={18}/> Admin Panel
                     </Link>
                   )}
 

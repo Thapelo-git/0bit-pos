@@ -1,7 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Clock, ClipboardList, CreditCard, Banknote, Wallet, MapPin, CheckCircle2, PartyPopper, XCircle, Ban } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -9,7 +10,7 @@ const RED  = "#DC143C";
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=120&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=120&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=120&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=120&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=120&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=120&auto=format&fit=crop",
 };
@@ -23,8 +24,8 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
   CANCELLED: { bg: "#f3f4f6", color: "#6b7280", label: "Cancelled" },
 };
 
-const PAY_ICON: Record<string, string> = {
-  CARD: "💳", EFT: "🏦", CASH: "💵",
+const PAY_ICON: Record<string, React.ReactNode> = {
+  CARD: <CreditCard size={13}/>, EFT: <Banknote size={13}/>, CASH: <Wallet size={13}/>,
 };
 
 interface Booking {
@@ -69,7 +70,7 @@ export default function MyOrdersPage() {
 
   if (loading) return (
     <div style={{ padding: "80px 20px", textAlign: "center", fontFamily: "sans-serif", color: "#71717A" }}>
-      <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>Loading your orders…
+      <div style={{ marginBottom: "12px", display:"flex", justifyContent:"center" }}><Clock size={32}/></div>Loading your orders…
     </div>
   );
 
@@ -126,7 +127,7 @@ export default function MyOrdersPage() {
 
         {shown.length === 0 ? (
           <div className="mo-empty">
-            <div style={{ fontSize: "56px", marginBottom: "16px" }}>📋</div>
+            <div style={{ marginBottom: "16px", display:"flex", justifyContent:"center" }}><ClipboardList size={56} color="#9ca3af"/></div>
             <h2 style={{ fontWeight: 900, color: "#0A0A0A", margin: "0 0 8px" }}>
               {filter === "ALL" ? "No orders yet" : `No ${STATUS_STYLE[filter]?.label || filter.toLowerCase()} orders`}
             </h2>
@@ -147,7 +148,7 @@ export default function MyOrdersPage() {
               const st    = STATUS_STYLE[b.status] || STATUS_STYLE.PENDING;
               const img   = b.service.imageUrl || CATEGORY_IMAGES[b.service.category] || fallback;
               const pm    = (b.paymentMethod || "").toUpperCase();
-              const pmIcon = PAY_ICON[pm] || "💰";
+              const pmIcon = PAY_ICON[pm] || <Wallet size={13}/>;
               return (
                 <div key={b.id} className="mo-card">
                   <div className="mo-card-top">
@@ -181,14 +182,14 @@ export default function MyOrdersPage() {
                   <div className="mo-card-foot">
                     <div>
                       <div className="mo-date">Booked {new Date(b.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}</div>
-                      {b.address && <div className="mo-addr" title={b.address}>📍 {b.address}</div>}
+                      {b.address && <div className="mo-addr" title={b.address} style={{display:"flex",alignItems:"center",gap:4}}><MapPin size={11}/>{b.address}</div>}
                     </div>
-                    <div className="mo-status-info">
-                      {b.status === "PENDING"   && "⏳ Awaiting vendor confirmation"}
-                      {b.status === "ACCEPTED"  && "✅ Vendor accepted — await service"}
-                      {b.status === "COMPLETED" && "🎉 Service completed"}
-                      {b.status === "REJECTED"  && "❌ Vendor could not fulfil this booking"}
-                      {b.status === "CANCELLED" && "🚫 Booking cancelled"}
+                    <div className="mo-status-info" style={{display:"flex",alignItems:"center",gap:4}}>
+                      {b.status === "PENDING"   && <><Clock size={12}/>Awaiting vendor confirmation</>}
+                      {b.status === "ACCEPTED"  && <><CheckCircle2 size={12}/>Vendor accepted — await service</>}
+                      {b.status === "COMPLETED" && <><PartyPopper size={12}/>Service completed</>}
+                      {b.status === "REJECTED"  && <><XCircle size={12}/>Vendor could not fulfil this booking</>}
+                      {b.status === "CANCELLED" && <><Ban size={12}/>Booking cancelled</>}
                     </div>
                   </div>
                 </div>

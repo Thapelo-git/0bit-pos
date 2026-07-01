@@ -80,7 +80,7 @@ const NEED_LIST = [
 const CATEGORIES = [
   "Home Cleaning",
   "Fitness & Wellness",
-  "Personal Services",
+  "Beauty & Grooming",
   "Home Maintenance & Trades",
   "Professional Training & Coaching",
   "Other Local Services",
@@ -89,7 +89,7 @@ const CATEGORIES = [
 const CAT_ICONS: Record<string, string> = {
   "Home Cleaning":                    "🧹",
   "Fitness & Wellness":               "🏋️",
-  "Personal Services":                "✂️",
+  "Beauty & Grooming":               "💅",
   "Home Maintenance & Trades":        "🔧",
   "Professional Training & Coaching": "🎓",
   "Other Local Services":             "🌍",

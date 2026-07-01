@@ -4,6 +4,7 @@ import { HttpStatus } from "@repo/types";
 import { AuthService } from "../auth/auth.service.js";
 import { catchAsync } from "../../utils/catchAsync.js";
 import { AppError } from "../../utils/appError.js";
+import { notify, notifyAdmins } from "../../utils/notify.js";
 
 const authService = new AuthService();
 
@@ -107,21 +108,27 @@ export const createService = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  const { isDeal, originalPrice } = req.body;
+  const { isDeal, originalPrice, dealExpiresAt } = req.body;
+  const dealFlag = isDeal === true || isDeal === "true";
 
   const service = await prisma.service.create({
     data: {
-      name:          name.trim(),
-      description:   description.trim(),
-      price:         parseFloat(String(price)),
+      name:           name.trim(),
+      description:    description.trim(),
+      price:          parseFloat(String(price)),
       category,
-      imageUrl:      imageUrl?.trim() || null,
+      imageUrl:       imageUrl?.trim() || null,
       vendorProfileId: vendorProfile.id,
-      isActive:      false,
-      isDeal:        isDeal === true || isDeal === "true",
-      originalPrice: isDeal && originalPrice ? parseFloat(String(originalPrice)) : null,
+      isActive:       false,
+      isDeal:         dealFlag,
+      originalPrice:  dealFlag && originalPrice ? parseFloat(String(originalPrice)) : null,
+      dealExpiresAt:  dealFlag && dealExpiresAt ? new Date(dealExpiresAt) : null,
     }
   });
+
+  const vendorUser = await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { displayName: true, email: true } });
+  const vendorName = vendorUser?.displayName || vendorUser?.email || "A vendor";
+  await notifyAdmins("New Service Pending Approval", `${vendorName} submitted a new service: "${service.name}". Review it in the admin panel.`, "/admin/vendors");
 
   return res.status(HttpStatus.CREATED).json({ status: "success", data: service });
 });
@@ -129,7 +136,7 @@ export const createService = catchAsync(async (req: Request, res: Response) => {
 // ── Update a service (name, description, price, category, image, deal) ───────
 export const updateService = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, description, price, category, imageUrl, isDeal, originalPrice } = req.body;
+  const { name, description, price, category, imageUrl, isDeal, originalPrice, dealExpiresAt } = req.body;
 
   const vendorProfile = await prisma.vendorProfile.findUnique({ where: { userId: req.user!.userId } });
   if (!vendorProfile) throw new AppError("Vendor profile not found", HttpStatus.NOT_FOUND);
@@ -138,17 +145,22 @@ export const updateService = catchAsync(async (req: Request, res: Response) => {
   if (!service || service.vendorProfileId !== vendorProfile.id)
     throw new AppError("Service not found", HttpStatus.NOT_FOUND);
 
+  const dealFlag = isDeal !== undefined ? (isDeal === true || isDeal === "true") : service.isDeal;
+
   const updated = await prisma.service.update({
     where: { id },
     data: {
-      ...(name        !== undefined && { name:          name.trim() }),
-      ...(description !== undefined && { description:   description.trim() }),
-      ...(price       !== undefined && { price:         parseFloat(String(price)) }),
-      ...(category    !== undefined && { category }),
-      ...(imageUrl    !== undefined && { imageUrl:      imageUrl || null }),
-      ...(isDeal      !== undefined && { isDeal:        isDeal === true || isDeal === "true" }),
+      ...(name          !== undefined && { name:          name.trim() }),
+      ...(description   !== undefined && { description:   description.trim() }),
+      ...(price         !== undefined && { price:         parseFloat(String(price)) }),
+      ...(category      !== undefined && { category }),
+      ...(imageUrl      !== undefined && { imageUrl:      imageUrl || null }),
+      ...(isDeal        !== undefined && { isDeal:        dealFlag }),
       ...(originalPrice !== undefined && {
-        originalPrice: isDeal && originalPrice ? parseFloat(String(originalPrice)) : null,
+        originalPrice: dealFlag && originalPrice ? parseFloat(String(originalPrice)) : null,
+      }),
+      ...(dealExpiresAt !== undefined && {
+        dealExpiresAt: dealFlag && dealExpiresAt ? new Date(dealExpiresAt) : null,
       }),
     },
   });
@@ -413,6 +425,8 @@ export const getDashboard = catchAsync(async (req: Request, res: Response) => {
       amount:        b.totalAmount,
       status:        b.status,
       paymentMethod: (b.paymentMethod || "N/A").toUpperCase(),
+      address:       b.address  || null,
+      notes:         b.notes    || null,
       date:          b.createdAt,
     });
   }
@@ -470,6 +484,15 @@ async function updateBookingStatus(
     throw new AppError(`Booking must be ${allowedCurrent.join(" or ")} to be ${newStatus.toLowerCase()}`, HttpStatus.BAD_REQUEST);
 
   const updated = await prisma.booking.update({ where: { id }, data: { status: newStatus } });
+
+  const notifMap: Record<string, { title: string; body: string }> = {
+    ACCEPTED:  { title: "Booking Accepted!", body: `Your booking for "${booking.service.name}" has been accepted by the vendor.` },
+    REJECTED:  { title: "Booking Declined",  body: `Your booking for "${booking.service.name}" was declined by the vendor.` },
+    COMPLETED: { title: "Service Completed", body: `Your booking for "${booking.service.name}" has been marked as completed.` },
+  };
+  const n = notifMap[newStatus];
+  if (n) await notify(booking.clientId, n.title, n.body, "/orders");
+
   return res.status(HttpStatus.OK).json({ status: "success", data: updated });
 }
 

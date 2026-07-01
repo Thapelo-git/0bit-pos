@@ -3,6 +3,7 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useCart } from "../../../src/shared/context/CartContext";
+import { CheckCircle2, X, Search } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -11,7 +12,7 @@ const CATEGORIES = [
   "All",
   "Home Cleaning",
   "Fitness & Wellness",
-  "Personal Services",
+  "Beauty & Grooming",
   "Home Maintenance & Trades",
   "Professional Training & Coaching",
   "Other Local Services",
@@ -20,7 +21,7 @@ const CATEGORIES = [
 const PLACEHOLDER_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=600&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=600&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=600&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=600&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=600&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=600&auto=format&fit=crop",
   "Other Local Services":             "https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600&auto=format&fit=crop",
@@ -148,8 +149,9 @@ function ServicesContent() {
         .svc-grid         { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:20px; }
         .svc-card         { background:#fff; border:1.5px solid #eaeaea; border-radius:12px; overflow:hidden; cursor:pointer; transition:border-color .15s, box-shadow .15s; text-decoration:none; color:inherit; display:block; }
         .svc-card:hover   { border-color:${RED}; box-shadow:0 4px 20px rgba(220,20,60,.1); }
-        .svc-card-img     { height:160px; overflow:hidden; background:#f1f5f9; }
-        .svc-card-img img { width:100%; height:100%; object-fit:cover; display:block; }
+        .svc-card-img     { height:180px; position:relative; overflow:hidden; background:#111; }
+        .svc-card-img .img-bg  { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:blur(14px) brightness(.55); transform:scale(1.15); display:block; }
+        .svc-card-img .img-fg  { position:relative; width:100%; height:100%; object-fit:contain; display:block; z-index:1; }
         .svc-card-body    { padding:16px; }
         .svc-card-cat     { display:inline-block; background:#fee2e2; color:${RED}; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:700; margin-bottom:8px; }
         .svc-card-name    { font-weight:700; font-size:15px; color:#0A0A0A; margin-bottom:4px; }
@@ -216,8 +218,8 @@ function ServicesContent() {
             <button
               type="button"
               onClick={() => { setSearch(""); setPage(1); const p = new URLSearchParams(); if (category !== "All") p.set("category", category); const q = p.toString(); router.push("/services" + (q ? "?" + q : "")); }}
-              style={{ marginLeft: 10, background: "none", border: "none", color: "rgba(255,255,255,.55)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}
-            >✕ clear</button>
+              style={{ marginLeft: 10, background: "none", border: "none", color: "rgba(255,255,255,.55)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0, display:"inline-flex", alignItems:"center", gap:"3px" }}
+            ><X size={12}/>clear</button>
           </p>
         )}
 
@@ -225,7 +227,7 @@ function ServicesContent() {
           className={`ai-toggle${aiOpen ? " open" : ""}`}
           onClick={() => { setAiOpen(o => !o); setAiResults(null); }}
         >
-          {aiOpen ? "✕ Close" : "✨ Smart Search"}
+          {aiOpen ? <span style={{display:"inline-flex",alignItems:"center",gap:"5px"}}><X size={13}/>Close</span> : "✨ Smart Search"}
         </button>
 
         {aiOpen && (
@@ -239,8 +241,8 @@ function ServicesContent() {
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAiSearch(); } }}
             />
             <div className="ai-actions">
-              <button className="ai-submit" onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()}>
-                {aiLoading ? "Thinking…" : "🔍 Search with AI"}
+              <button className="ai-submit" onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} style={{display:"inline-flex",alignItems:"center",gap:"6px"}}>
+                {aiLoading ? "Thinking…" : <><Search size={14}/>Search with AI</>}
               </button>
               <span className="ai-hint">Detects category from your words</span>
             </div>
@@ -260,7 +262,7 @@ function ServicesContent() {
               <span>{aiResults.data.length} service{aiResults.data.length !== 1 ? "s" : ""} found</span>
             </div>
           </div>
-          <button className="ai-clear" onClick={() => setAiResults(null)}>✕ Clear</button>
+          <button className="ai-clear" onClick={() => setAiResults(null)} style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><X size={12}/>Clear</button>
         </div>
       )}
 
@@ -300,7 +302,7 @@ function ServicesContent() {
       ) : aiResults ? (
         aiResults.data.length === 0 ? (
           <div className="svc-empty">
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🤖</div>
+            <div style={{ fontSize: "48px", marginBottom: "16px", display:"flex", justifyContent:"center" }}>🤖</div>
             <h3 className="svc-empty-h3">No {aiResults.meta.category || "matching"} services yet</h3>
             <p style={{ marginBottom: 8 }}>
               AI matched your search to <strong>{aiResults.meta.category || "a category"}</strong> but no providers have listed services there yet.
@@ -314,16 +316,17 @@ function ServicesContent() {
           <div className="svc-grid">
             {aiResults.data.map((svc: any) => (
               <Link key={svc.id} href={`/services/${svc.id}`} className="svc-card">
-                <div className="svc-card-img" style={{ position: "relative" }}>
-                  <img src={svc.imageUrl || getImage(svc.category)} alt={svc.name} onError={e => { (e.target as HTMLImageElement).src = getImage(svc.category); }} />
-                  {svc.isDeal && <span style={{ position: "absolute", top: 8, right: 8, background: "#f59e0b", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px" }}>🔥 DEAL</span>}
+                <div className="svc-card-img">
+                  <img className="img-bg" src={svc.imageUrl || getImage(svc.category)} alt="" aria-hidden />
+                  <img className="img-fg" src={svc.imageUrl || getImage(svc.category)} alt={svc.name} onError={e => { (e.target as HTMLImageElement).src = getImage(svc.category); }} />
+                  {svc.isDeal && <span style={{ position: "absolute", top: 8, right: 8, background: "#f59e0b", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px", zIndex: 2 }}>🔥 DEAL</span>}
                 </div>
                 <div className="svc-card-body">
                   <span className="svc-card-cat">{svc.category}</span>
                   <div className="svc-card-name">{svc.name}</div>
                   <div className="svc-card-vendor">
                     {svc.vendorProfile?.businessName}
-                    {svc.vendorProfile?.isVerified && <span className="svc-verified">✓ Verified</span>}
+                    {svc.vendorProfile?.isVerified && <span className="svc-verified" style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={10}/>Verified</span>}
                   </div>
                   {svc.reviewCount > 0 && (
                     <div className="svc-stars">
@@ -335,7 +338,7 @@ function ServicesContent() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span className="svc-card-price">R {Number(svc.price).toFixed(2)}</span>
                     <button className="svc-card-book" onClick={e => { e.preventDefault(); addItem({ id: svc.id, name: svc.name, price: Number(svc.price), category: svc.category, imageUrl: svc.imageUrl, vendorName: svc.vendorProfile?.businessName }); }}>
-                      {isInCart(svc.id) ? "✓ Added" : "+ Booking"}
+                      {isInCart(svc.id) ? <span style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={12}/>Added</span> : "+ Booking"}
                     </button>
                   </div>
                 </div>
@@ -349,7 +352,7 @@ function ServicesContent() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="svc-empty">
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
+          <div style={{ marginBottom: "16px", display:"flex", justifyContent:"center" }}><Search size={48} color="#71717A"/></div>
           <h3 className="svc-empty-h3">No services found</h3>
           <p>Try a different category or search term.</p>
           <button
@@ -365,20 +368,12 @@ function ServicesContent() {
             <Link key={svc.id} href={`/services/${svc.id}`} className="svc-card">
               <div style={{ position: "relative" }}>
                 <div className="svc-card-img">
-                  <img
-                    src={svc.imageUrl || getImage(svc.category)}
-                    alt={svc.name}
-                    onError={e => { (e.target as HTMLImageElement).src = getImage(svc.category); }}
-                  />
+                  <img className="img-bg" src={svc.imageUrl || getImage(svc.category)} alt="" aria-hidden />
+                  <img className="img-fg" src={svc.imageUrl || getImage(svc.category)} alt={svc.name} onError={e => { (e.target as HTMLImageElement).src = getImage(svc.category); }} />
                 </div>
                 {svc.isDeal && (
-                  <span style={{ position: "absolute", top: 8, right: 8, background: "#f59e0b", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px" }}>
+                  <span style={{ position: "absolute", top: 8, right: 8, background: "#f59e0b", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px", zIndex: 2 }}>
                     🔥 DEAL
-                  </span>
-                )}
-                {svc.vendorProfile?.isVerified && (
-                  <span style={{ position: "absolute", top: 8, left: 8, background: "#15803d", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px", display: "flex", alignItems: "center", gap: 4 }}>
-                    ✓ Verified
                   </span>
                 )}
               </div>
@@ -387,7 +382,7 @@ function ServicesContent() {
                 <div className="svc-card-name">{svc.name}</div>
                 <div className="svc-card-vendor">
                   {svc.vendorProfile?.businessName || "Verified Provider"}
-                  {svc.vendorProfile?.isVerified && <span className="svc-verified">✓ Verified</span>}
+                  {svc.vendorProfile?.isVerified && <span className="svc-verified" style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={10}/>Verified</span>}
                 </div>
                 {svc.reviewCount > 0 ? (
                   <div className="svc-stars">
@@ -420,7 +415,7 @@ function ServicesContent() {
                       });
                     }}
                   >
-                    {isInCart(svc.id) ? "✓ Added" : "Add to Booking"}
+                    {isInCart(svc.id) ? <span style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={12}/>Added</span> : "Add to Booking"}
                   </button>
                 </div>
               </div>

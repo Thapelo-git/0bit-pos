@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { CheckCircle2, X, Eye, Pencil, Trash2, Wrench, Image, Link as LinkIcon, Clock, Bell, CheckCheck, MapPin, FileText, CreditCard, Banknote, Wallet, ChevronDown, ChevronUp } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -8,7 +9,7 @@ const RED  = "#DC143C";
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=600&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=600&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=600&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=600&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=600&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=600&auto=format&fit=crop",
   "Other Local Services":             "https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600&auto=format&fit=crop",
@@ -21,13 +22,13 @@ function getCategoryImage(category: string) {
 const CATEGORIES = [
   "Home Cleaning",
   "Fitness & Wellness",
-  "Personal Services",
+  "Beauty & Grooming",
   "Home Maintenance & Trades",
   "Professional Training & Coaching",
   "Other Local Services",
 ];
 
-type Tab = "overview" | "services" | "profile";
+type Tab = "overview" | "services" | "profile" | "notifications";
 
 export default function VendorDashboard() {
   const [tab,      setTab]      = useState<Tab>("overview");
@@ -50,7 +51,7 @@ export default function VendorDashboard() {
   // Create / Edit service form
   const [showForm,   setShowForm]   = useState(false);
   const [editingId,  setEditingId]  = useState<string | null>(null);
-  const [form,       setForm]       = useState({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "" });
+  const [form,       setForm]       = useState({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "", dealExpiresAt: "" });
   const [imageMode,  setImageMode]  = useState<"file" | "url">("file");
   const [formMsg,    setFormMsg]    = useState<{ text: string; ok: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +67,7 @@ export default function VendorDashboard() {
       imageUrl:      svc.imageUrl      || "",
       isDeal:        svc.isDeal        || false,
       originalPrice: svc.originalPrice ? String(svc.originalPrice) : "",
+      dealExpiresAt: svc.dealExpiresAt ? new Date(svc.dealExpiresAt).toISOString().split("T")[0] : "",
     });
     setImageMode(svc.imageUrl?.startsWith("data:") ? "file" : "url");
     setFormMsg(null);
@@ -75,7 +77,7 @@ export default function VendorDashboard() {
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setForm({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "" });
+    setForm({ name: "", description: "", price: "", category: CATEGORIES[0], imageUrl: "", isDeal: false, originalPrice: "", dealExpiresAt: "" });
     setFormMsg(null);
   };
 
@@ -104,7 +106,52 @@ export default function VendorDashboard() {
     reader.readAsDataURL(file);
   };
 
-  const [dashRefresh, setDashRefresh] = useState(0);
+  const [dashRefresh,  setDashRefresh]  = useState(0);
+  const [expandedId,   setExpandedId]   = useState<string | null>(null);
+
+  // Notifications
+  const [notifs,       setNotifs]      = useState<{ id: string; title: string; body: string; read: boolean; link?: string | null; createdAt: string }[]>([]);
+  const [notifUnread,  setNotifUnread] = useState(0);
+  const [notifLoading, setNotifLoading] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await fetch(`${API}/notifications`, { credentials: "include" });
+        if (!r.ok) return;
+        const j = await r.json();
+        setNotifs(j.data?.notifications ?? []);
+        setNotifUnread(j.data?.unreadCount ?? 0);
+      } catch {}
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const markAllNotifs = async () => {
+    setNotifLoading(true);
+    try {
+      await fetch(`${API}/notifications/read-all`, { method: "PATCH", credentials: "include" });
+      setNotifs(ns => ns.map(n => ({ ...n, read: true })));
+      setNotifUnread(0);
+    } catch {} finally { setNotifLoading(false); }
+  };
+
+  const deleteNotif = async (id: string) => {
+    await fetch(`${API}/notifications/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+    const removed = notifs.find(n => n.id === id);
+    setNotifs(ns => ns.filter(n => n.id !== id));
+    if (removed && !removed.read) setNotifUnread(u => Math.max(0, u - 1));
+  };
+
+  const timeAgo = (iso: string) => {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)    return "just now";
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
 
   // Load dashboard data
   useEffect(() => {
@@ -219,6 +266,7 @@ export default function VendorDashboard() {
       imageUrl:      form.imageUrl || undefined,
       isDeal:        form.isDeal,
       originalPrice: form.isDeal && form.originalPrice ? parseFloat(form.originalPrice) : undefined,
+      dealExpiresAt: form.isDeal && form.dealExpiresAt ? form.dealExpiresAt : undefined,
     };
     try {
       const isEdit = !!editingId;
@@ -299,6 +347,13 @@ export default function VendorDashboard() {
         .status-CANCELLED { background:#f3f4f6; color:#6b7280; }
 
         .pay-badge       { padding:3px 9px; border-radius:10px; font-size:11px; font-weight:700; background:#f8fafc; color:#374151; white-space:nowrap; }
+        .tx-row-main     { cursor:pointer; }
+        .tx-row-main:hover td { background:#fafafa; }
+        .tx-expand td    { padding:0 !important; border-bottom:2px solid #f0f0f0; }
+        .tx-expand-inner { padding:16px 20px; background:#f8fafc; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px 24px; }
+        .tx-detail-item  { display:flex; flex-direction:column; gap:3px; }
+        .tx-detail-lbl   { font-size:11px; font-weight:700; color:#71717A; text-transform:uppercase; letter-spacing:.4px; display:flex; align-items:center; gap:4px; }
+        .tx-detail-val   { font-size:13px; color:#0A0A0A; font-weight:600; line-height:1.5; }
         .action-btn      { padding:5px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; border:none; font-family:sans-serif; transition:opacity .15s; }
         .action-btn:disabled { opacity:.5; cursor:not-allowed; }
         .btn-accept      { background:#dbeafe; color:#1e40af; }
@@ -365,7 +420,7 @@ export default function VendorDashboard() {
 
         {isPending ? (
           <div className="pending-box">
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>⏳</div>
+            <div style={{ marginBottom: "16px", display:"flex", justifyContent:"center" }}><Clock size={48} color="#92400e"/></div>
             <h2>Pending Admin Approval</h2>
             <p>
               Your vendor application is under review. Once approved, you will receive an email
@@ -379,6 +434,19 @@ export default function VendorDashboard() {
               <button className={`vd-tab${tab === "overview"  ? " active" : ""}`} onClick={() => setTab("overview")}>Overview</button>
               <button className={`vd-tab${tab === "services"  ? " active" : ""}`} onClick={() => setTab("services")}>My Services</button>
               <button className={`vd-tab${tab === "profile"   ? " active" : ""}`} onClick={() => setTab("profile")}>Business Profile</button>
+              <button
+                className={`vd-tab${tab === "notifications" ? " active" : ""}`}
+                onClick={() => setTab("notifications")}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <Bell size={14}/>
+                Notifications
+                {notifUnread > 0 && (
+                  <span style={{ background: RED, color: "#fff", borderRadius: "50%", minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, padding: "0 3px" }}>
+                    {notifUnread > 9 ? "9+" : notifUnread}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* ── OVERVIEW TAB ─────────────────────────────────────────── */}
@@ -430,45 +498,81 @@ export default function VendorDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {data?.transactions?.length ? data.transactions.map((t: any) => (
-                          <tr key={t.id}>
-                            <td style={{ fontWeight: 600 }}>{t.name}</td>
-                            <td style={{ color: "#71717A", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.deal}</td>
-                            <td style={{ color: "#71717A", whiteSpace: "nowrap" }}>{t.phoneNumber || "—"}</td>
-                            <td>
-                              <span className="pay-badge">
-                                {t.paymentMethod === "CARD" ? "💳 Card" : t.paymentMethod === "EFT" ? "🏦 EFT" : t.paymentMethod === "CASH" ? "💵 Cash" : t.paymentMethod || "—"}
-                              </span>
-                            </td>
-                            <td style={{ fontWeight: 700, color: RED, whiteSpace: "nowrap" }}>R {Number(t.amount).toFixed(2)}</td>
-                            <td>
-                              <span className={`status-badge status-${t.status || "PENDING"}`}>
-                                {t.status || "PENDING"}
-                              </span>
-                            </td>
-                            <td style={{ whiteSpace: "nowrap" }}>
-                              {t.status === "PENDING" && (
-                                <div style={{ display: "flex", gap: 4 }}>
-                                  <button className="action-btn btn-accept"   disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "accept")}>
-                                    {bookingBusy[t.id] ? "…" : "✓ Accept"}
-                                  </button>
-                                  <button className="action-btn btn-reject"   disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "reject")}>
-                                    {bookingBusy[t.id] ? "…" : "✕ Reject"}
-                                  </button>
-                                </div>
+                        {data?.transactions?.length ? data.transactions.map((t: any) => {
+                          const isOpen = expandedId === t.id;
+                          const pmLabel = t.paymentMethod === "CARD" ? "Credit / Debit Card" : t.paymentMethod === "EFT" ? "EFT / Bank Transfer" : t.paymentMethod === "CASH" ? "Cash on Delivery" : t.paymentMethod || "—";
+                          const pmIcon  = t.paymentMethod === "CARD" ? <CreditCard size={12}/> : t.paymentMethod === "EFT" ? <Banknote size={12}/> : <Wallet size={12}/>;
+                          return (
+                            <React.Fragment key={t.id}>
+                              <tr className="tx-row-main" onClick={() => setExpandedId(isOpen ? null : t.id)}>
+                                <td style={{ fontWeight: 600 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                    {isOpen ? <ChevronUp size={13} color="#9ca3af"/> : <ChevronDown size={13} color="#9ca3af"/>}
+                                    {t.name}
+                                  </div>
+                                </td>
+                                <td style={{ color: "#71717A", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.deal}</td>
+                                <td style={{ color: "#71717A", whiteSpace: "nowrap" }}>{t.phoneNumber || "—"}</td>
+                                <td>
+                                  <span className="pay-badge" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                    {pmIcon}{t.paymentMethod === "CARD" ? "Card" : t.paymentMethod === "EFT" ? "EFT" : t.paymentMethod === "CASH" ? "Cash" : t.paymentMethod || "—"}
+                                  </span>
+                                </td>
+                                <td style={{ fontWeight: 700, color: RED, whiteSpace: "nowrap" }}>R {Number(t.amount).toFixed(2)}</td>
+                                <td>
+                                  <span className={`status-badge status-${t.status || "PENDING"}`}>
+                                    {t.status || "PENDING"}
+                                  </span>
+                                </td>
+                                <td style={{ whiteSpace: "nowrap" }} onClick={e => e.stopPropagation()}>
+                                  {t.status === "PENDING" && (
+                                    <div style={{ display: "flex", gap: 4 }}>
+                                      <button className="action-btn btn-accept" disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "accept")}>
+                                        {bookingBusy[t.id] ? "…" : <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><CheckCircle2 size={13}/>Accept</span>}
+                                      </button>
+                                      <button className="action-btn btn-reject" disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "reject")}>
+                                        {bookingBusy[t.id] ? "…" : <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><X size={13}/>Reject</span>}
+                                      </button>
+                                    </div>
+                                  )}
+                                  {t.status === "ACCEPTED" && (
+                                    <button className="action-btn btn-complete" disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "complete")}>
+                                      {bookingBusy[t.id] ? "…" : <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><CheckCircle2 size={13}/>Mark Done</span>}
+                                    </button>
+                                  )}
+                                  {(t.status === "COMPLETED" || t.status === "REJECTED" || t.status === "CANCELLED") && (
+                                    <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
+                                  )}
+                                </td>
+                                <td style={{ color: "#71717A", whiteSpace: "nowrap" }}>{new Date(t.date).toLocaleDateString("en-ZA")}</td>
+                              </tr>
+                              {isOpen && (
+                                <tr key={`${t.id}-expand`} className="tx-expand">
+                                  <td colSpan={8}>
+                                    <div className="tx-expand-inner">
+                                      <div className="tx-detail-item">
+                                        <span className="tx-detail-lbl"><MapPin size={11}/>Delivery Address</span>
+                                        <span className="tx-detail-val">{t.address || "No address provided"}</span>
+                                      </div>
+                                      <div className="tx-detail-item">
+                                        <span className="tx-detail-lbl"><FileText size={11}/>Customer Notes</span>
+                                        <span className="tx-detail-val">{t.notes || "No notes added"}</span>
+                                      </div>
+                                      <div className="tx-detail-item">
+                                        <span className="tx-detail-lbl">{pmIcon}Payment Method</span>
+                                        <span className="tx-detail-val">{pmLabel}</span>
+                                      </div>
+                                      <div className="tx-detail-item">
+                                        <span className="tx-detail-lbl">Email</span>
+                                        <span className="tx-detail-val">{t.email || "—"}</span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
                               )}
-                              {t.status === "ACCEPTED" && (
-                                <button className="action-btn btn-complete" disabled={!!bookingBusy[t.id]} onClick={() => handleBookingAction(t.id, "complete")}>
-                                  {bookingBusy[t.id] ? "…" : "✓ Mark Done"}
-                                </button>
-                              )}
-                              {(t.status === "COMPLETED" || t.status === "REJECTED" || t.status === "CANCELLED") && (
-                                <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
-                              )}
-                            </td>
-                            <td style={{ color: "#71717A", whiteSpace: "nowrap" }}>{new Date(t.date).toLocaleDateString("en-ZA")}</td>
-                          </tr>
-                        )) : (
+                            </React.Fragment>
+                          );
+                        }) : (
                           <tr>
                             <td colSpan={8} style={{ textAlign: "center", padding: "40px", color: "#71717A" }}>
                               No bookings yet. Add services to start receiving bookings.
@@ -499,7 +603,7 @@ export default function VendorDashboard() {
                   <div style={{ textAlign: "center", padding: "40px", color: "#71717A" }}>Loading services...</div>
                 ) : services.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "60px 20px", background: "#fff", borderRadius: "12px", border: "1.5px solid #eaeaea" }}>
-                    <div style={{ fontSize: "48px", marginBottom: "16px" }}>🛠</div>
+                    <div style={{ marginBottom: "16px", display:"flex", justifyContent:"center" }}><Wrench size={48} color="#71717A"/></div>
                     <h3 style={{ margin: "0 0 8px" }}>No services yet</h3>
                     <p style={{ color: "#71717A", margin: "0 0 20px" }}>Create your first service to start receiving bookings.</p>
                     <button className="btn-primary" onClick={() => setShowForm(true)}>+ Create Service</button>
@@ -509,12 +613,18 @@ export default function VendorDashboard() {
                     {services.map(svc => (
                       <div key={svc.id} className="svc-item" style={{ padding: 0, overflow: "hidden" }}>
                         {/* Image */}
-                        <div style={{ height: "130px", position: "relative", background: "#f1f5f9" }}>
+                        <div style={{ height: "140px", position: "relative", overflow: "hidden", background: "#111" }}>
+                          <img
+                            src={svc.imageUrl || getCategoryImage(svc.category)}
+                            alt=""
+                            aria-hidden
+                            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(14px) brightness(.5)", transform: "scale(1.15)", display: "block" }}
+                          />
                           <img
                             src={svc.imageUrl || getCategoryImage(svc.category)}
                             alt={svc.name}
                             onError={e => { (e.target as HTMLImageElement).src = getCategoryImage(svc.category); }}
-                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                            style={{ position: "relative", width: "100%", height: "100%", objectFit: "contain", display: "block", zIndex: 1 }}
                           />
                           <span style={{
                             position: "absolute", top: "10px", right: "10px",
@@ -522,7 +632,7 @@ export default function VendorDashboard() {
                             color: "#fff", fontSize: "10px", fontWeight: 800,
                             padding: "3px 8px", borderRadius: "4px", letterSpacing: "0.5px"
                           }}>
-                            {svc.isActive ? "✓ LIVE" : "⏳ PENDING APPROVAL"}
+                            {svc.isActive ? <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><CheckCircle2 size={10}/>LIVE</span> : <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><Clock size={10}/>PENDING APPROVAL</span>}
                           </span>
                         </div>
                         <div style={{ padding: "14px" }}>
@@ -536,20 +646,21 @@ export default function VendorDashboard() {
                               borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#333",
                               textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, justifyContent: "center",
                             }}>
-                              👁 Preview
+                              <Eye size={13}/> Preview
                             </Link>
                             <button
-                              style={{ padding: "9px 12px", background: "#dbeafe", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 700, color: "#1e40af", cursor: "pointer" }}
+                              style={{ padding: "9px 12px", background: "#dbeafe", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 700, color: "#1e40af", cursor: "pointer", display:"inline-flex", alignItems:"center", gap:4 }}
                               onClick={() => openEdit(svc)}
                             >
-                              ✏️ Edit
+                              <Pencil size={13}/> Edit
                             </button>
                             <button
                               className="btn-delete"
                               disabled={deletingId === svc.id}
                               onClick={() => handleDeleteService(svc.id, svc.name)}
+                              style={{display:"inline-flex",alignItems:"center",justifyContent:"center"}}
                             >
-                              {deletingId === svc.id ? "…" : "🗑"}
+                              {deletingId === svc.id ? "…" : <Trash2 size={14}/>}
                             </button>
                           </div>
                         </div>
@@ -588,7 +699,7 @@ export default function VendorDashboard() {
 
                   <p className="profile-section" style={{ marginTop: 24 }}>Banking Details</p>
                   <div className="bank-note">
-                    💡 Your banking details are only used by kasiFix admin for payouts. They are never shared with customers.
+                    Your banking details are only used by kasiFix admin for payouts. They are never shared with customers.
                   </div>
                   <div className="form-group">
                     <label className="form-label">Bank Account Details</label>
@@ -609,6 +720,55 @@ export default function VendorDashboard() {
                     {profileSaving ? "Saving…" : "Save Business Details"}
                   </button>
                 </form>
+              </div>
+            )}
+
+            {/* ── NOTIFICATIONS TAB ─────────────────────────────────────── */}
+            {tab === "notifications" && (
+              <div style={{ maxWidth: 640 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Notifications</h3>
+                  {notifUnread > 0 && (
+                    <button
+                      onClick={markAllNotifs}
+                      disabled={notifLoading}
+                      style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: `1.5px solid ${RED}`, borderRadius: 8, color: RED, fontWeight: 700, fontSize: 13, padding: "7px 14px", cursor: "pointer" }}
+                    >
+                      <CheckCheck size={15}/> Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {notifs.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
+                    <Bell size={36} style={{ marginBottom: 12, opacity: .4 }}/>
+                    <p style={{ margin: 0, fontSize: 14 }}>No notifications yet</p>
+                  </div>
+                ) : (
+                  <div style={{ border: "1.5px solid #eaeaea", borderRadius: 10, overflow: "hidden" }}>
+                    {notifs.map((n, i) => (
+                      <div key={n.id} style={{
+                        display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px",
+                        background: n.read ? "#fff" : "#fff8f8",
+                        borderBottom: i < notifs.length - 1 ? "1px solid #f3f4f6" : "none",
+                      }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: n.read ? "transparent" : RED, marginTop: 6, flexShrink: 0 }}/>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: n.read ? 600 : 800, fontSize: 14, color: "#111", marginBottom: 3 }}>{n.title}</div>
+                          <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>{n.body}</div>
+                          <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 5 }}>{timeAgo(n.createdAt)}</div>
+                        </div>
+                        <button
+                          onClick={() => deleteNotif(n.id)}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#d1d5db", padding: 4, borderRadius: 4, flexShrink: 0 }}
+                          title="Delete"
+                        >
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -701,7 +861,7 @@ export default function VendorDashboard() {
                         transition: "background .15s",
                       }}
                     >
-                      {mode === "file" ? "📁 Upload from Device" : "🔗 Image URL"}
+                      {mode === "file" ? <span style={{display:"inline-flex",alignItems:"center",gap:"5px"}}><Image size={14}/>Upload from Device</span> : <span style={{display:"inline-flex",alignItems:"center",gap:"5px"}}><LinkIcon size={14}/>Image URL</span>}
                     </button>
                   ))}
                 </div>
@@ -735,7 +895,7 @@ export default function VendorDashboard() {
                         <img
                           src={form.imageUrl}
                           alt="Preview"
-                          style={{ width: "100%", height: "140px", objectFit: "cover", borderRadius: "8px" }}
+                          style={{ width: "100%", height: "140px", objectFit: "contain", borderRadius: "8px", background: "#111" }}
                         />
                         <button
                           type="button"
@@ -744,13 +904,13 @@ export default function VendorDashboard() {
                             position: "absolute", top: "6px", right: "6px",
                             background: "rgba(0,0,0,.6)", color: "#fff", border: "none",
                             borderRadius: "50%", width: "24px", height: "24px", cursor: "pointer",
-                            fontSize: "14px", fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center"
+                            display: "flex", alignItems: "center", justifyContent: "center"
                           }}
-                        >×</button>
+                        ><X size={14}/></button>
                       </div>
                     ) : (
                       <>
-                        <span style={{ fontSize: "32px" }}>🖼️</span>
+                        <Image size={32} color="#9ca3af"/>
                         <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>Click to choose or drag &amp; drop</span>
                         <span style={{ fontSize: "11px", color: "#9ca3af" }}>JPG, PNG, WEBP — max 3 MB</span>
                       </>
@@ -795,27 +955,48 @@ export default function VendorDashboard() {
                     style={{ width: 18, height: 18, accentColor: "#f59e0b", cursor: "pointer" }}
                   />
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>🔥 Mark as Deal</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "#92400e" }}>Mark as Deal</div>
                     <div style={{ fontSize: 11, color: "#b45309", marginTop: 2 }}>This service will appear on the Deals page with a discount badge</div>
                   </div>
                 </label>
                 {form.isDeal && (
-                  <div style={{ marginTop: 12 }}>
-                    <label className="form-label" style={{ color: "#92400e" }}>Original Price (R) — before discount</label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="e.g. 850"
-                      value={form.originalPrice}
-                      onChange={e => setForm(p => ({ ...p, originalPrice: e.target.value }))}
-                      style={{ borderColor: "#fde68a" }}
-                    />
-                    {form.originalPrice && form.price && parseFloat(form.originalPrice) <= parseFloat(form.price) && (
-                      <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>Original price must be higher than the deal price.</p>
-                    )}
-                  </div>
+                  <>
+                    <div style={{ marginTop: 12 }}>
+                      <label className="form-label" style={{ color: "#92400e" }}>Original Price (R) — before discount</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g. 850"
+                        value={form.originalPrice}
+                        onChange={e => setForm(p => ({ ...p, originalPrice: e.target.value }))}
+                        style={{ borderColor: "#fde68a" }}
+                      />
+                      {form.originalPrice && form.price && parseFloat(form.originalPrice) <= parseFloat(form.price) && (
+                        <p style={{ fontSize: 11, color: "#dc2626", marginTop: 4 }}>Original price must be higher than the deal price.</p>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <label className="form-label" style={{ color: "#92400e", display: "flex", alignItems: "center", gap: 6 }}>
+                        <Clock size={13} /> Deal Expiry Date <span style={{ fontWeight: 400, color: "#b45309" }}>(optional)</span>
+                      </label>
+                      <input
+                        className="form-input"
+                        type="date"
+                        min={new Date().toISOString().split("T")[0]}
+                        value={form.dealExpiresAt}
+                        onChange={e => setForm(p => ({ ...p, dealExpiresAt: e.target.value }))}
+                        style={{ borderColor: "#fde68a", colorScheme: "light" }}
+                      />
+                      {form.dealExpiresAt && (
+                        <p style={{ fontSize: 11, color: "#92400e", marginTop: 4 }}>
+                          Deal expires on {new Date(form.dealExpiresAt).toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}
+                        </p>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
 

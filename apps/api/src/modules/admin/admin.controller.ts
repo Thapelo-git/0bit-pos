@@ -4,6 +4,7 @@ import { HttpStatus, Role } from "@repo/types";
 import { catchAsync } from "../../utils/catchAsync.js";
 import { AppError }   from "../../utils/appError.js";
 import { sendInviteEmail, sendVendorApprovalEmail } from "../../services/mail.service.js";
+import { notify, notifyAdmins } from "../../utils/notify.js";
 
 // ── Admin dashboard ────────────────────────────────────────────────────────────
 
@@ -251,15 +252,14 @@ export const updateVendorStatus = catchAsync(async (req: Request, res: Response)
 
   if (vendor.vendorProfile) {
     const profileActive = accountStatus === "ACTIVE";
-    await prisma.vendorProfile.update({
-      where: { id: vendor.vendorProfile.id },
-      data:  { isActive: profileActive },
-    });
-    await prisma.service.updateMany({
-      where: { vendorProfileId: vendor.vendorProfile.id },
-      data:  { isActive: profileActive },
-    });
+    await prisma.vendorProfile.update({ where: { id: vendor.vendorProfile.id }, data: { isActive: profileActive } });
+    await prisma.service.updateMany({ where: { vendorProfileId: vendor.vendorProfile.id }, data: { isActive: profileActive } });
   }
+
+  const statusMsg = accountStatus === "ACTIVE"   ? { title: "Account Reactivated", body: "Your vendor account has been reactivated. Your services are now live." }
+                  : accountStatus === "SUSPENDED" ? { title: "Account Suspended",   body: "Your vendor account has been suspended. Please contact support." }
+                  : { title: "Account Status Updated", body: `Your account status changed to ${accountStatus}.` };
+  await notify(id, statusMsg.title, statusMsg.body, "/dashboard");
 
   return res.status(HttpStatus.OK).json({ status: "success", message: "Vendor status updated" });
 });
@@ -337,6 +337,8 @@ export const approveVendor = catchAsync(async (req: Request, res: Response) => {
   });
   req.auditLogged = true;
 
+  await notify(id, "Account Approved!", "Your vendor account is now live. Start accepting bookings on kasiFix.", "/dashboard");
+
   return res.status(HttpStatus.OK).json({ status: "success", message: "Vendor approved successfully" });
 });
 
@@ -364,12 +366,17 @@ export const approveService = catchAsync(async (req: Request, res: Response) => 
   const service = await prisma.service.findUnique({ where: { id } });
   if (!service) throw new AppError("Service not found", HttpStatus.NOT_FOUND);
 
+  const svcWithVendor = await prisma.service.findUnique({ where: { id }, include: { vendorProfile: true } });
   await prisma.service.update({ where: { id }, data: { isActive: true } });
 
   await prisma.auditLog.create({
     data: { userId: req.user!.userId, action: "SERVICE_APPROVED", meta: { serviceId: id } }
   });
   req.auditLogged = true;
+
+  if (svcWithVendor) {
+    await notify(svcWithVendor.vendorProfile.userId, "Service Approved & Live!", `Your service "${svcWithVendor.name}" is now live on kasiFix.`, "/dashboard");
+  }
 
   return res.status(HttpStatus.OK).json({ status: "success", message: "Service approved and now live" });
 });
@@ -381,12 +388,17 @@ export const rejectService = catchAsync(async (req: Request, res: Response) => {
   const service = await prisma.service.findUnique({ where: { id } });
   if (!service) throw new AppError("Service not found", HttpStatus.NOT_FOUND);
 
+  const svcOff = await prisma.service.findUnique({ where: { id }, include: { vendorProfile: true } });
   await prisma.service.update({ where: { id }, data: { isActive: false } });
 
   await prisma.auditLog.create({
     data: { userId: req.user!.userId, action: "SERVICE_REJECTED", meta: { serviceId: id } }
   });
   req.auditLogged = true;
+
+  if (svcOff) {
+    await notify(svcOff.vendorProfile.userId, "Service Taken Offline", `Your service "${svcOff.name}" has been taken offline by an admin.`, "/dashboard");
+  }
 
   return res.status(HttpStatus.OK).json({ status: "success", message: "Service deactivated" });
 });
@@ -449,4 +461,117 @@ export const updateUserRole = catchAsync(async (req: Request, res: Response) => 
   await prisma.user.update({ where: { id }, data: { role } });
 
   return res.status(HttpStatus.OK).json({ status: "success", message: "User role updated" });
+});
+
+// ── Get pending payouts (completed bookings not yet paid out) ─────────────────
+
+export const getPendingPayouts = catchAsync(async (_req: Request, res: Response) => {
+  const bookings = await prisma.booking.findMany({
+    where:   { status: "COMPLETED", payoutStatus: "PENDING" },
+    include: {
+      client:  { select: { displayName: true, firstName: true, email: true, phone: true } },
+      service: {
+        include: {
+          vendorProfile: {
+            select: { id: true, businessName: true, bankDetails: true, phone: true, userId: true },
+          },
+        },
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  // Platform fee per booking is R30 — vendor receives totalAmount - 30
+  const payouts = bookings.map(b => ({
+    id:            b.id,
+    clientName:    b.client.displayName || `${b.client.firstName || ""}`.trim() || b.client.email,
+    serviceName:   b.service.name,
+    totalAmount:   b.totalAmount,
+    vendorAmount:  b.totalAmount - 30,
+    paymentMethod: b.paymentMethod,
+    completedAt:   b.updatedAt,
+    vendor: {
+      profileId:    b.service.vendorProfile.id,
+      businessName: b.service.vendorProfile.businessName,
+      bankDetails:  b.service.vendorProfile.bankDetails,
+      phone:        b.service.vendorProfile.phone,
+      userId:       b.service.vendorProfile.userId,
+    },
+  }));
+
+  const totalOwed = payouts.reduce((s, p) => s + p.vendorAmount, 0);
+
+  return res.status(HttpStatus.OK).json({ status: "success", data: { payouts, totalOwed } });
+});
+
+// ── Mark a booking payout as paid ────────────────────────────────────────────
+
+export const markPayoutPaid = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const booking = await prisma.booking.findUnique({
+    where:   { id },
+    include: { service: { include: { vendorProfile: true } } },
+  });
+  if (!booking) throw new AppError("Booking not found", HttpStatus.NOT_FOUND);
+  if (booking.status !== "COMPLETED")
+    throw new AppError("Only completed bookings can be marked as paid out", HttpStatus.BAD_REQUEST);
+  if (booking.payoutStatus === "PAID")
+    throw new AppError("This booking has already been paid out", HttpStatus.BAD_REQUEST);
+
+  await prisma.booking.update({
+    where: { id },
+    data:  { payoutStatus: "PAID", payoutDate: new Date() },
+  });
+
+  await prisma.auditLog.create({
+    data: { userId: req.user!.userId, action: "PAYOUT_MARKED_PAID", meta: { bookingId: id } },
+  });
+  req.auditLogged = true;
+
+  // Notify the vendor
+  await notify(
+    booking.service.vendorProfile.userId,
+    "Payout Processed!",
+    `Your payout of R ${(booking.totalAmount - 30).toFixed(2)} for "${booking.service.name}" has been sent to your bank account.`,
+    "/dashboard",
+  );
+
+  return res.status(HttpStatus.OK).json({ status: "success", message: "Payout marked as paid" });
+});
+
+// ── Get all payouts history (paid + pending) ──────────────────────────────────
+
+export const getPayoutsHistory = catchAsync(async (req: Request, res: Response) => {
+  const page  = Math.max(1, parseInt(String(req.query.page || "1")));
+  const limit = 50;
+
+  const [bookings, total] = await Promise.all([
+    prisma.booking.findMany({
+      where:   { status: "COMPLETED" },
+      include: {
+        service: {
+          include: { vendorProfile: { select: { businessName: true, bankDetails: true } } },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+      skip:    (page - 1) * limit,
+      take:    limit,
+    }),
+    prisma.booking.count({ where: { status: "COMPLETED" } }),
+  ]);
+
+  const rows = bookings.map(b => ({
+    id:            b.id,
+    serviceName:   b.service.name,
+    businessName:  b.service.vendorProfile.businessName,
+    bankDetails:   b.service.vendorProfile.bankDetails,
+    totalAmount:   b.totalAmount,
+    vendorAmount:  b.totalAmount - 30,
+    payoutStatus:  b.payoutStatus,
+    payoutDate:    b.payoutDate,
+    completedAt:   b.updatedAt,
+  }));
+
+  return res.status(HttpStatus.OK).json({ status: "success", data: { rows, total, page } });
 });

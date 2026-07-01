@@ -1,23 +1,20 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { CheckCircle2, Star, Shield, Phone, Lock, MessageCircle, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
 
-const HERO_IMAGES: Record<string, string> = {
-  "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=1470&auto=format&fit=crop",
-  "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1470&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=1470&auto=format&fit=crop",
-  "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=1470&auto=format&fit=crop",
-  "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=1470&auto=format&fit=crop",
-  "Other Local Services":             "https://images.unsplash.com/photo-1444653389962-81492d1136b8?q=80&w=1470&auto=format&fit=crop",
-};
-
-function getHeroImage(cat: string | null) {
-  return HERO_IMAGES[cat || "Home Cleaning"] || HERO_IMAGES["Home Cleaning"];
-}
+const SLIDER_ITEMS = [
+  { category: "Home Cleaning",                    badge: "TRENDING DEAL",    sub: "Find a pro today",          img: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=1470&auto=format&fit=crop",  accent: RED },
+  { category: "Beauty & Grooming",               badge: "BEAUTY & GROOMING", sub: "Book your stylist",         img: "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=1470&auto=format&fit=crop",  accent: "#1a1a2e" },
+  { category: "Fitness & Wellness",               badge: "WELLNESS",          sub: "Start your journey",        img: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1470&auto=format&fit=crop",  accent: RED },
+  { category: "Home Maintenance & Trades",        badge: "HIRE A PRO",        sub: "Fix it fast",               img: "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=1470&auto=format&fit=crop",  accent: "#0A0A0A" },
+  { category: "Professional Training & Coaching", badge: "COACHING",          sub: "Learn from experts",        img: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=1470&auto=format&fit=crop",  accent: "#1a0a0a" },
+  { category: "Other Local Services",             badge: "LOCAL SERVICES",    sub: "Explore what's near you",   img: "https://images.unsplash.com/photo-1444653389962-81492d1136b8?q=80&w=1470&auto=format&fit=crop",  accent: "#0A0A0A" },
+];
 
 const TESTIMONIALS = [
   { text: "I found an amazing cleaner through kasiFix. She was on time, thorough, and my house has never looked better. I feel safe booking because of the verification badges.", name: "Naledi M.", location: "Soweto, GP" },
@@ -50,12 +47,12 @@ function TrustSection() {
 
       <div className="trust-grid">
         {[
-          { icon: "✅", title: "Verified Businesses", desc: "Every listed vendor undergoes ID, credential, and business registration verification before going live." },
-          { icon: "⭐", title: "Real Customer Reviews", desc: "Only confirmed customers can leave reviews — no fake ratings. Star scores reflect genuine experiences." },
-          { icon: "🛡", title: "Secure Bookings", desc: "Your bookings and payments are protected. Dispute resolution is built in if something goes wrong." },
-          { icon: "📞", title: "Responsive Support", desc: "Our team is reachable 7 days a week to help with any booking issues or provider concerns." },
-          { icon: "🔒", title: "Background Checked", desc: "High-trust categories (home access, childcare, medical) require enhanced background screening." },
-          { icon: "💬", title: "Satisfaction Guarantee", desc: "Not happy? We offer free rebooking or a full refund for services that don&apos;t meet your expectations." },
+          { icon: <CheckCircle2 size={32} color="#DC143C"/>, title: "Verified Businesses", desc: "Every listed vendor undergoes ID, credential, and business registration verification before going live." },
+          { icon: <Star size={32} color="#DC143C"/>, title: "Real Customer Reviews", desc: "Only confirmed customers can leave reviews — no fake ratings. Star scores reflect genuine experiences." },
+          { icon: <Shield size={32} color="#DC143C"/>, title: "Secure Bookings", desc: "Your bookings and payments are protected. Dispute resolution is built in if something goes wrong." },
+          { icon: <Phone size={32} color="#DC143C"/>, title: "Responsive Support", desc: "Our team is reachable 7 days a week to help with any booking issues or provider concerns." },
+          { icon: <Lock size={32} color="#DC143C"/>, title: "Background Checked", desc: "High-trust categories (home access, childcare, medical) require enhanced background screening." },
+          { icon: <MessageCircle size={32} color="#DC143C"/>, title: "Satisfaction Guarantee", desc: "Not happy? We offer free rebooking or a full refund for services that don&apos;t meet your expectations." },
         ].map(c => (
           <div key={c.title} className="trust-card">
             <div className="trust-icon">{c.icon}</div>
@@ -184,28 +181,8 @@ function LandingPage() {
         }
       `}</style>
 
-      {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <div className="hero-section" style={{ marginBottom: "40px" }}>
-        <div className="hero-image" style={{ backgroundImage: `url(${getHeroImage(cat)})` }} />
-        <div className="hero-overlay" />
-        <div className="hero-content">
-          <span className="hero-badge">
-            {cat ? "CATEGORY SPOTLIGHT" : "SOUTH AFRICA'S SERVICE MARKETPLACE"}
-          </span>
-          <h1 className="hero-title">
-            {cat
-              ? cat.toUpperCase()
-              : <>BOOK LOCAL<br /><span style={{ color: RED }}>PROS TODAY</span></>
-            }
-          </h1>
-          <p className="hero-sub">
-            {cat
-              ? `Trusted ${cat} professionals near you`
-              : "Find vetted service providers across South Africa. Fast, affordable, reliable."}
-          </p>
-          <Link href="/services" className="hero-cta">Explore Services →</Link>
-        </div>
-      </div>
+      {/* ── CATEGORY SLIDER ──────────────────────────────────────────────── */}
+      <CategorySlider />
 
       {/* ── TRENDING DEALS ────────────────────────────────────────────────── */}
       <div className="section-header">
@@ -222,55 +199,9 @@ function LandingPage() {
         )}
       </div>
 
-      {/* ── CATEGORY BANNERS ─────────────────────────────────────────────── */}
-      <div className="section-header">
-        <div>
-          <span className="section-title" style={{ marginRight: "10px" }}>Get Deals By Category</span>
-          <span style={{ fontSize: "12px", color: "#71717A" }}>Don&apos;t miss out — book a professional today</span>
-        </div>
-        <Link href="/services" style={{
-          border: `1px solid ${RED}`, color: RED, backgroundColor: "transparent",
-          padding: "5px 15px", borderRadius: "20px", cursor: "pointer",
-          fontSize: "12px", fontWeight: 600, textDecoration: "none"
-        }}>
-          View All →
-        </Link>
-      </div>
 
-      <div className="category-banners">
-        <CategoryBanner
-          bg={RED}
-          title="Keep Your Home Spotless Without Lifting a Finger"
-          desc="Book trusted local cleaning professionals for a cleaner, healthier space."
-          btn="Find a Cleaner Today"
-          url="Home Cleaning"
-          img="https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=600&auto=format&fit=crop"
-        />
-        <CategoryBanner
-          bg="#0A0A0A"
-          title="Your Health, Your Schedule — Book Fitness &amp; Wellness Experts"
-          desc="Stay active and feel your best with certified trainers and wellness coaches."
-          btn="Start Your Wellness Journey"
-          url="Fitness & Wellness"
-          img="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1470&auto=format&fit=crop"
-        />
-        <CategoryBanner
-          bg="#1a1a2e"
-          title="Beauty, Grooming &amp; Personal Care on Your Schedule"
-          desc="Feel confident and pampered with top-rated service providers you can trust."
-          btn="Book Personal Services"
-          url="Personal Services"
-          img="https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=1470&auto=format&fit=crop"
-        />
-        <CategoryBanner
-          bg="#0A0A0A"
-          title="Home Maintenance &amp; Skilled Trades"
-          desc="Find trusted plumbers, electricians, and handymen to keep your home running."
-          btn="Hire a Pro Today"
-          url="Home Maintenance & Trades"
-          img="https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=1470&auto=format&fit=crop"
-        />
-      </div>
+      {/* ── CATEGORY BANNERS ─────────────────────────────────────────────── */}
+      <CategoryBanners />
 
       {/* ── TRUST & CREDIBILITY ──────────────────────────────────────────── */}
       <TrustSection />
@@ -300,37 +231,226 @@ export default function LandingPageWrapper() {
 }
 
 const BG_IMAGES = [
-  "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=600&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1571171637578-41bc2dd41cd2?w=600&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?w=600&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=900&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1571171637578-41bc2dd41cd2?w=900&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?w=900&auto=format&fit=crop",
 ];
 
+function dealExpiryLabel(expiresAt?: string | null): { label: string; urgent: boolean } | null {
+  if (!expiresAt) return null;
+  const diff = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000);
+  if (diff < 0)   return null;
+  if (diff === 0) return { label: "Expires today",    urgent: true };
+  if (diff === 1) return { label: "Expires tomorrow", urgent: true };
+  if (diff <= 3)  return { label: `Expires in ${diff} days`, urgent: true };
+  return { label: `Expires ${new Date(expiresAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}`, urgent: false };
+}
+
 function TrendingCard({ deal, index }: { deal: any; index: number }) {
+  const expiry = dealExpiryLabel(deal.dealExpiresAt);
+  const img    = deal.imageUrl || BG_IMAGES[index % BG_IMAGES.length];
   return (
     <div className="deal-card">
-      <div className="deal-card-bg" style={{ backgroundImage: `url(${BG_IMAGES[index % BG_IMAGES.length]})` }} />
+      <img src={img} alt={deal.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }} />
       <div className="deal-card-overlay" />
       <div className="deal-card-body">
-        <span className="deal-badge">THIS WEEK</span>
+        <span className="deal-badge">🔥 THIS WEEK</span>
         <div className="deal-title">{deal.name}</div>
         <div className="deal-meta">R {Number(deal.price).toFixed(2)} · {deal.category}</div>
-        <Link href={`/services/${deal.id}`} className="deal-btn">Book Now →</Link>
+        {expiry && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: expiry.urgent ? "#ef4444" : "rgba(255,255,255,.18)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20, marginBottom: 8 }}>
+            <Clock size={11} /> {expiry.label}
+          </div>
+        )}
+        <div><Link href={`/services/${deal.id}`} className="deal-btn">Book Now →</Link></div>
       </div>
     </div>
   );
 }
 
-function CategoryBanner({ bg, title, desc, btn, url, img }: {
-  bg: string; title: string; desc: string; btn: string; url: string; img: string
-}) {
+function CategorySlider() {
+  const [active, setActive] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const restart = (idx: number) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setActive((idx + SLIDER_ITEMS.length) % SLIDER_ITEMS.length);
+    timerRef.current = setInterval(() => setActive(a => (a + 1) % SLIDER_ITEMS.length), 4500);
+  };
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => setActive(a => (a + 1) % SLIDER_ITEMS.length), 4500);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  const item = SLIDER_ITEMS[active];
+
   return (
-    <div className="cat-banner" style={{ backgroundColor: bg, color: "#fff" }}>
-      <div className="cat-banner-img" style={{ backgroundImage: `url(${img})` }} />
-      <div className="cat-banner-grad" style={{ background: `linear-gradient(90deg, ${bg} 42%, transparent 100%)` }} />
-      <div className="cat-banner-body">
-        <h2 className="cat-banner-h2" dangerouslySetInnerHTML={{ __html: title }} />
-        <p className="cat-banner-p">{desc}</p>
-        <Link href={`/services?category=${encodeURIComponent(url)}`} className="cat-banner-btn">{btn}</Link>
+    <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", marginBottom: 40, height: 340, background: "#0A0A0A", userSelect: "none" }}>
+
+      {/* Images — fade between slides */}
+      {SLIDER_ITEMS.map((s, i) => (
+        <img
+          key={s.category}
+          src={s.img}
+          alt={s.category}
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%",
+            objectFit: "cover",
+            objectPosition: s.category.includes("Training") || s.category.includes("Personal") ? "center 20%" : "center 40%",
+            opacity: i === active ? 1 : 0,
+            transition: "opacity 0.75s ease",
+            display: "block",
+          }}
+        />
+      ))}
+
+      {/* Dark left-to-right gradient so text is readable */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg,rgba(0,0,0,.85) 0%,rgba(0,0,0,.5) 50%,rgba(0,0,0,.15) 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top,rgba(0,0,0,.45) 0%,transparent 60%)" }} />
+
+      {/* Accent colour strip on right */}
+      <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "26%", background: item.accent, opacity: 0.88, transition: "background 0.75s" }} />
+      <div style={{ position: "absolute", top: 0, right: "26%", bottom: 0, width: 70, background: `linear-gradient(90deg,transparent,${item.accent}dd)`, transition: "background 0.75s" }} />
+
+      {/* Slide content */}
+      <div style={{ position: "relative", zIndex: 10, height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 48px", maxWidth: "60%" }}>
+        <span style={{ display: "inline-block", background: RED, color: "#fff", fontSize: 10, fontWeight: 800, letterSpacing: 1.5, padding: "4px 12px", borderRadius: 4, marginBottom: 14, width: "fit-content" }}>
+          {item.badge}
+        </span>
+        <h2 style={{ color: "#fff", fontSize: "clamp(24px,3.5vw,48px)", fontWeight: 900, margin: "0 0 10px", lineHeight: 1.05, textTransform: "uppercase" }}>
+          {item.category}
+        </h2>
+        <p style={{ color: "rgba(255,255,255,.65)", fontSize: 14, margin: "0 0 22px" }}>{item.sub}</p>
+        <Link
+          href={`/services?category=${encodeURIComponent(item.category)}`}
+          style={{ display: "inline-block", background: "#fff", color: "#0A0A0A", padding: "10px 22px", borderRadius: 6, fontWeight: 800, fontSize: 13, textDecoration: "none", width: "fit-content" }}
+        >
+          Find a Pro Today →
+        </Link>
+      </div>
+
+      {/* Category list on right accent panel */}
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "26%", zIndex: 11, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 18px", gap: 4 }}>
+        {SLIDER_ITEMS.map((s, i) => (
+          <button
+            key={s.category}
+            onClick={() => restart(i)}
+            style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: "7px 10px", borderRadius: 6, borderLeft: `3px solid ${i === active ? "#fff" : "rgba(255,255,255,.3)"}`, transition: "all .25s" }}
+          >
+            <div style={{ color: i === active ? "#fff" : "rgba(255,255,255,.5)", fontSize: 11, fontWeight: i === active ? 800 : 500, lineHeight: 1.35, transition: "color .25s" }}>
+              {s.category}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Prev / Next */}
+      <button onClick={() => restart(active - 1)} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", zIndex: 12, background: "rgba(0,0,0,.5)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" }}>
+        <ChevronLeft size={20} />
+      </button>
+      <button onClick={() => restart(active + 1)} style={{ position: "absolute", left: 54, top: "50%", transform: "translateY(-50%)", zIndex: 12, background: "rgba(0,0,0,.5)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" }}>
+        <ChevronRight size={20} />
+      </button>
+
+      {/* Progress dots */}
+      <div style={{ position: "absolute", bottom: 14, left: 48, zIndex: 12, display: "flex", gap: 6, alignItems: "center" }}>
+        {SLIDER_ITEMS.map((_, i) => (
+          <button key={i} onClick={() => restart(i)} style={{ width: i === active ? 22 : 7, height: 7, borderRadius: 4, background: i === active ? "#fff" : "rgba(255,255,255,.4)", border: "none", cursor: "pointer", padding: 0, transition: "all .35s" }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const CAT_BANNERS = [
+  {
+    bg: "#1565C0", textColor: "#fff",
+    heading: "Keep Your Home Spotless\nWithout Lifting a Finger",
+    sub: "Book trusted local cleaning professionals for a cleaner, healthier space.",
+    cta: "Find a Cleaner Today",
+    img: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=700&auto=format&fit=crop",
+    imgLeft: true,
+    href: "/services?category=Home+Cleaning",
+  },
+  {
+    bg: "#2E7D32", textColor: "#fff",
+    heading: "Your Health, Your Schedule\nBook Fitness & Wellness Experts",
+    sub: "Stay active and feel your best with certified trainers and wellness coaches.",
+    cta: "Start Your Wellness Journey",
+    img: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=700&auto=format&fit=crop",
+    imgLeft: false,
+    href: "/services?category=Fitness+%26+Wellness",
+  },
+  {
+    bg: "#F9A825", textColor: "#0A0A0A",
+    heading: "Beauty, Grooming & Self-Care\nOn Your Schedule",
+    sub: "Feel confident and pampered with top-rated beauty services you can trust.",
+    cta: "Book Beauty & Care",
+    img: "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=700&auto=format&fit=crop",
+    imgLeft: true,
+    href: "/services?category=Beauty+%26+Grooming",
+  },
+  {
+    bg: "#00838F", textColor: "#fff",
+    heading: "Home Maintenance & Trades",
+    sub: "Find trusted professionals to keep your home running smoothly.",
+    cta: "Hire a Pro Today",
+    img: "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?q=80&w=700&auto=format&fit=crop",
+    imgLeft: false,
+    href: "/services?category=Home+Maintenance+%26+Trades",
+  },
+  {
+    bg: "#E65100", textColor: "#fff",
+    heading: "Professional Training,\nTutoring & Coaching",
+    sub: "Learn, Grow, and Succeed — With Expert Guidance.",
+    cta: "Find a Trainer or Tutor",
+    img: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=700&auto=format&fit=crop",
+    imgLeft: true,
+    href: "/services?category=Professional+Training+%26+Coaching",
+  },
+];
+
+function CategoryBanners() {
+  return (
+    <div style={{ margin: "40px 0" }}>
+      <style>{`
+        .cat-banners     { display:flex; flex-direction:column; gap:12px; }
+        .cat-banner      { border-radius:14px; overflow:hidden; display:flex; min-height:180px; }
+        .cat-banner.flip { flex-direction:row-reverse; }
+        .cb-img-side     { width:38%; flex-shrink:0; overflow:hidden; position:relative; }
+        .cb-img-side img { width:100%; height:100%; object-fit:cover; object-position:center top; display:block; }
+        .cb-text-side    { flex:1; display:flex; flex-direction:column; justify-content:center; padding:28px 32px; }
+        .cb-heading      { margin:0 0 8px; font-size:clamp(15px,2.2vw,22px); font-weight:900; line-height:1.25; white-space:pre-line; font-family:sans-serif; }
+        .cb-sub          { margin:0 0 18px; font-size:clamp(12px,1.4vw,14px); line-height:1.6; opacity:.88; font-family:sans-serif; max-width:380px; }
+        .cb-btn          { display:inline-block; padding:9px 20px; border-radius:8px; font-weight:800; font-size:13px; text-decoration:none; align-self:flex-start; font-family:sans-serif; transition:opacity .15s; }
+        .cb-btn:hover    { opacity:.88; }
+        @media(max-width:640px) {
+          .cat-banner, .cat-banner.flip { flex-direction:column; }
+          .cb-img-side    { width:100%; height:160px; }
+          .cb-text-side   { padding:20px; }
+          .cb-btn         { align-self:stretch; text-align:center; }
+        }
+      `}</style>
+      <div className="cat-banners">
+        {CAT_BANNERS.map((b, i) => {
+          const btnBg    = b.textColor === "#fff" ? "rgba(255,255,255,.95)" : "#0A0A0A";
+          const btnColor = b.textColor === "#fff" ? b.bg : "#fff";
+          return (
+            <div key={i} className={`cat-banner${b.imgLeft ? "" : " flip"}`} style={{ background: b.bg }}>
+              <div className="cb-img-side">
+                <img src={b.img} alt={b.cta} />
+              </div>
+              <div className="cb-text-side" style={{ color: b.textColor }}>
+                <h3 className="cb-heading">{b.heading}</h3>
+                <p className="cb-sub">{b.sub}</p>
+                <Link href={b.href} className="cb-btn" style={{ background: btnBg, color: btnColor }}>
+                  {b.cta}
+                </Link>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

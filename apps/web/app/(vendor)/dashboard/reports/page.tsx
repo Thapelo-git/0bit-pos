@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { BarChart2 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -51,7 +52,7 @@ export default function ReportsPage() {
   if (!data) {
     return (
       <div style={{ padding: "40px", textAlign: "center", color: "#71717A" }}>
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>📊</div>
+        <div style={{ marginBottom: "16px", display:"flex", justifyContent:"center" }}><BarChart2 size={48} color="#9ca3af"/></div>
         <div style={{ fontWeight: 700 }}>No report data available yet</div>
         <p>Start accepting bookings to see your performance reports here.</p>
       </div>

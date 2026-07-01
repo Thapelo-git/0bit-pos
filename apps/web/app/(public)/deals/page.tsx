@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useCart } from "../../../src/shared/context/CartContext";
+import { Search, CheckCircle2 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -9,7 +10,7 @@ const RED  = "#DC143C";
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=600&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=600&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=600&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=600&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=600&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=600&auto=format&fit=crop",
   "Other Local Services":             "https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600&auto=format&fit=crop",
@@ -54,8 +55,9 @@ function DealsContent() {
         .deals-grid     { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; }
         .deal-card      { background:#fff; border:2px solid #fde68a; border-radius:14px; overflow:hidden; transition:box-shadow .15s,border-color .15s; }
         .deal-card:hover{ box-shadow:0 6px 24px rgba(245,158,11,.2); border-color:#f59e0b; }
-        .deal-img-wrap  { position:relative; height:170px; overflow:hidden; background:#f1f5f9; }
-        .deal-img-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
+        .deal-img-wrap  { position:relative; height:170px; overflow:hidden; background:#111; }
+        .deal-img-wrap .img-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:blur(14px) brightness(.5); transform:scale(1.15); display:block; }
+        .deal-img-wrap .img-fg { position:relative; width:100%; height:100%; object-fit:contain; display:block; z-index:1; }
         .deal-badge     { position:absolute; top:10px; right:10px; background:#f59e0b; color:#fff; font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px; }
         .deal-savings   { position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,rgba(0,0,0,.7)); padding:14px 14px 10px; color:#fff; font-size:12px; font-weight:700; }
         .deal-body      { padding:16px; }
@@ -104,7 +106,7 @@ function DealsContent() {
         </div>
       ) : deals.length === 0 ? (
         <div className="deals-empty">
-          <div style={{ fontSize: 56, marginBottom: 16 }}>🔍</div>
+          <div style={{ marginBottom: 16, display:"flex", justifyContent:"center" }}><Search size={56} color="#71717A"/></div>
           <h2 style={{ fontWeight: 900, color: "#0A0A0A", margin: "0 0 8px" }}>No deals right now</h2>
           <p style={{ color: "#71717A", marginBottom: 28 }}>Check back soon — vendors post new deals daily.</p>
           <Link href="/services" style={{ background: RED, color: "#fff", padding: "13px 28px", borderRadius: 8, fontWeight: 800, textDecoration: "none" }}>
@@ -119,13 +121,10 @@ function DealsContent() {
             return (
               <div key={deal.id} className="deal-card">
                 <div className="deal-img-wrap">
-                  <img
-                    src={deal.imageUrl || getImg(deal.category)}
-                    alt={deal.name}
-                    onError={e => { (e.target as HTMLImageElement).src = getImg(deal.category); }}
-                  />
-                  <span className="deal-badge">🔥 DEAL</span>
-                  {saving > 0 && <div className="deal-savings">Save R {saving.toFixed(2)}</div>}
+                  <img className="img-bg" src={deal.imageUrl || getImg(deal.category)} alt="" aria-hidden />
+                  <img className="img-fg" src={deal.imageUrl || getImg(deal.category)} alt={deal.name} onError={e => { (e.target as HTMLImageElement).src = getImg(deal.category); }} />
+                  <span className="deal-badge" style={{ zIndex: 2, position: "absolute" }}>🔥 DEAL</span>
+                  {saving > 0 && <div className="deal-savings" style={{ zIndex: 2 }}>Save R {saving.toFixed(2)}</div>}
                 </div>
                 <div className="deal-body">
                   <span className="deal-cat">{deal.category}</span>
@@ -150,7 +149,7 @@ function DealsContent() {
                     )}
                   </div>
                   <div className="deal-actions">
-                    <Link href={`/services/${deal.id}`} className="deal-book-now">⚡ Book Now</Link>
+                    <Link href={`/services/${deal.id}`} className="deal-book-now">Book Now</Link>
                     <button
                       className={`deal-add-btn${isInCart(deal.id) ? " added" : ""}`}
                       onClick={() => addItem({
@@ -158,8 +157,9 @@ function DealsContent() {
                         category: deal.category, imageUrl: deal.imageUrl,
                         vendorName: deal.vendorProfile?.businessName,
                       })}
+                      style={{display:"inline-flex",alignItems:"center",justifyContent:"center",gap:"4px"}}
                     >
-                      {isInCart(deal.id) ? "✓ Added" : "+ Booking"}
+                      {isInCart(deal.id) ? <><CheckCircle2 size={13}/>Added</> : "+ Booking"}
                     </button>
                   </div>
                 </div>
