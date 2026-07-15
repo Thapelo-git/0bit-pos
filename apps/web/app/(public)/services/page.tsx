@@ -51,6 +51,7 @@ function ServicesContent() {
 
   const [services,    setServices]    = useState<any[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [fetchError,  setFetchError]  = useState(false);
   const [category,    setCategory]    = useState(initCategory);
   const [search,      setSearch]      = useState(initSearch);
   const [minPrice,    setMinPrice]    = useState(Number(searchParams.get("minPrice") || 0));
@@ -77,17 +78,22 @@ function ServicesContent() {
 
   const PER_PAGE = 12;
 
-  useEffect(() => {
+  const loadServices = (cat: string) => {
     setLoading(true);
+    setFetchError(false);
     const params = new URLSearchParams();
-    if (category !== "All") params.set("category", category);
-    const qs = params.toString();
-    fetch(`${API}/clients/services/search${qs ? `?${qs}` : ""}`)
+    if (cat !== "All") params.set("category", cat);
+    const qs  = params.toString();
+    const ctl = new AbortController();
+    const tid = setTimeout(() => ctl.abort(), 10000); // 10 s timeout
+    fetch(`${API}/clients/services/search${qs ? `?${qs}` : ""}`, { signal: ctl.signal })
       .then(r => r.json())
       .then(j => { if (j.status === "success") setServices(j.data || []); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [category]);
+      .catch(() => setFetchError(true))
+      .finally(() => { clearTimeout(tid); setLoading(false); });
+  };
+
+  useEffect(() => { loadServices(category); }, [category]);
 
   // Keep state in sync when searchParams change externally (e.g. from layout search / price filter)
   useEffect(() => {
@@ -349,6 +355,18 @@ function ServicesContent() {
       ) : loading ? (
         <div className="svc-grid">
           {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="svc-skeleton" />)}
+        </div>
+      ) : fetchError ? (
+        <div className="svc-empty">
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
+          <h3 className="svc-empty-h3">Could not load services</h3>
+          <p style={{ marginBottom: 20 }}>The server took too long to respond. Please check your connection and try again.</p>
+          <button
+            onClick={() => loadServices(category)}
+            style={{ background: RED, color: "#fff", border: "none", padding: "10px 24px", borderRadius: "6px", fontWeight: 700, cursor: "pointer" }}
+          >
+            Retry
+          </button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="svc-empty">
