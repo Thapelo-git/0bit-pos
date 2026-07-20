@@ -43,7 +43,10 @@ export default function VendorProfilePage() {
     phone:        "",
     locationText: "",
     bankDetails:  "",
+    latitude:     null as number | null,
+    longitude:    null as number | null,
   });
+  const [locLoading, setLocLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/vendors/profile`, { credentials: "include" })
@@ -59,6 +62,8 @@ export default function VendorProfilePage() {
             phone:        p?.phone        || u.phone || "",
             locationText: p?.locationText || "",
             bankDetails:  p?.bankDetails  || "",
+            latitude:     p?.latitude     ?? null,
+            longitude:    p?.longitude    ?? null,
           });
         }
       })
@@ -222,6 +227,25 @@ export default function VendorProfilePage() {
                     onChange={e => setForm(p => ({ ...p, locationText: e.target.value }))}
                     placeholder="e.g. Soweto, Johannesburg"
                   />
+                  <button
+                    type="button"
+                    disabled={locLoading}
+                    onClick={() => {
+                      if (!navigator.geolocation) return;
+                      setLocLoading(true);
+                      navigator.geolocation.getCurrentPosition(
+                        pos => {
+                          setForm(p => ({ ...p, latitude: pos.coords.latitude, longitude: pos.coords.longitude }));
+                          setLocLoading(false);
+                        },
+                        () => setLocLoading(false),
+                        { timeout: 8000 }
+                      );
+                    }}
+                    style={{ marginTop: 6, background: "none", border: "1.5px solid #eaeaea", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#374151", display: "inline-flex", alignItems: "center", gap: 5 }}
+                  >
+                    📍 {locLoading ? "Detecting…" : form.latitude ? `Location saved (${form.latitude.toFixed(3)}, ${form.longitude?.toFixed(3)})` : "Use my current location"}
+                  </button>
                 </div>
               </div>
               <div className="vp-row">

@@ -674,38 +674,85 @@ function SubNav({ pathname }: { pathname: string }) {
   );
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+
 function CategoryList() {
   const searchParams = useSearchParams();
   const cat = searchParams.get("category");
+  const [expanded, setExpanded]   = useState<string | null>(null);
+  const [svcs,     setSvcs]       = useState<Record<string, any[]>>({});
+  const [loading,  setLoading]    = useState<Record<string, boolean>>({});
+
+  const toggle = async (label: string) => {
+    if (expanded === label) { setExpanded(null); return; }
+    setExpanded(label);
+    if (svcs[label]) return; // already fetched
+    setLoading(p => ({ ...p, [label]: true }));
+    try {
+      const res  = await fetch(`${API_BASE}/clients/services/search?category=${encodeURIComponent(label)}`);
+      const json = await res.json();
+      setSvcs(p => ({ ...p, [label]: json.status === "success" ? (json.data || []).slice(0, 5) : [] }));
+    } catch {
+      setSvcs(p => ({ ...p, [label]: [] }));
+    } finally {
+      setLoading(p => ({ ...p, [label]: false }));
+    }
+  };
 
   return (
     <ul style={{ listStyle: "none", margin: 0, padding: "8px 0" }}>
-      {CATEGORIES.map(label => (
-        <CategoryItem key={label} label={label} active={cat === label} />
-      ))}
-    </ul>
-  );
-}
+      {CATEGORIES.map(label => {
+        const isOpen    = expanded === label;
+        const isActive  = cat === label;
+        const items     = svcs[label] || [];
+        const isLoading = loading[label];
+        return (
+          <li key={label}>
+            <button
+              onClick={() => toggle(label)}
+              style={{
+                width: "100%", background: "none", border: "none", cursor: "pointer",
+                padding: "10px 16px", fontSize: "14px", display: "flex",
+                justifyContent: "space-between", alignItems: "center",
+                color: isActive ? RED : "#333", fontWeight: isActive ? 700 : 400,
+                backgroundColor: isOpen ? "#fef2f2" : isActive ? "#fff1f2" : "transparent",
+              }}
+            >
+              <span>{label}</span>
+              <span style={{ color: isOpen ? RED : "#ccc", transition: "transform .2s", display: "inline-block", transform: isOpen ? "rotate(90deg)" : "none" }}>›</span>
+            </button>
 
-function CategoryItem({ label, active }: { label: string; active?: boolean }) {
-  return (
-    <li>
-      <Link
-        href={`/services?category=${encodeURIComponent(label)}`}
-        style={{
-          padding: "10px 16px",
-          fontSize: "14px",
-          color: active ? RED : "#333",
-          fontWeight: active ? 700 : 400,
-          textDecoration: "none",
-          display: "flex",
-          justifyContent: "space-between",
-          backgroundColor: active ? "#fff1f2" : "transparent",
-        }}
-      >
-        <span>{label}</span>
-        <span style={{ color: "#ccc" }}>›</span>
-      </Link>
-    </li>
+            {isOpen && (
+              <div style={{ background: "#f9f9f9", borderLeft: `3px solid ${RED}`, marginLeft: 16, marginBottom: 4 }}>
+                {isLoading ? (
+                  <p style={{ padding: "8px 12px", fontSize: 12, color: "#9ca3af" }}>Loading…</p>
+                ) : items.length === 0 ? (
+                  <p style={{ padding: "8px 12px", fontSize: 12, color: "#9ca3af" }}>No services listed yet.</p>
+                ) : (
+                  <>
+                    {items.map((s: any) => (
+                      <Link
+                        key={s.id}
+                        href={`/services/${s.id}`}
+                        style={{ display: "block", padding: "8px 12px", fontSize: 12, color: "#374151", textDecoration: "none", borderBottom: "1px solid #f0f0f0" }}
+                      >
+                        <div style={{ fontWeight: 600, marginBottom: 1 }}>{s.name}</div>
+                        <div style={{ color: RED, fontWeight: 700 }}>R {Number(s.price).toFixed(0)}</div>
+                      </Link>
+                    ))}
+                    <Link
+                      href={`/services?category=${encodeURIComponent(label)}`}
+                      style={{ display: "block", padding: "7px 12px", fontSize: 11, color: RED, fontWeight: 700, textDecoration: "none" }}
+                    >
+                      View all in {label} →
+                    </Link>
+                  </>
+                )}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

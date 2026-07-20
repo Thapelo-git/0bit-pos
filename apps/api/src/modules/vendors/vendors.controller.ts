@@ -328,7 +328,7 @@ export const getProfile = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateProfile = catchAsync(async (req: Request, res: Response) => {
-  const { businessName, description, phone, locationText, bankDetails } = req.body;
+  const { businessName, description, phone, locationText, bankDetails, latitude, longitude } = req.body;
 
   const profile = await prisma.vendorProfile.findUnique({ where: { userId: req.user!.userId } });
   if (!profile) throw new AppError("Vendor profile not found", HttpStatus.NOT_FOUND);
@@ -342,6 +342,8 @@ export const updateProfile = catchAsync(async (req: Request, res: Response) => {
         ...(locationText  !== undefined && { locationText }),
         ...(bankDetails   !== undefined && { bankDetails }),
         ...(phone         !== undefined && { phone }),
+        ...(latitude      !== undefined && latitude !== null && { latitude:  Number(latitude)  }),
+        ...(longitude     !== undefined && longitude !== null && { longitude: Number(longitude) }),
       },
     }),
     prisma.user.update({

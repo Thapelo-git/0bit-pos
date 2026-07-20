@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useCart } from "../../../src/shared/context/CartContext";
-import { CheckCircle2, X, Search } from "lucide-react";
+import { CheckCircle2, X, Search, MapPin, Loader2 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -56,6 +56,9 @@ function ServicesContent() {
   const [search,      setSearch]      = useState(initSearch);
   const [minPrice,    setMinPrice]    = useState(Number(searchParams.get("minPrice") || 0));
   const [maxPrice,    setMaxPrice]    = useState(Number(searchParams.get("maxPrice") || 0));
+  const [userCoords,  setUserCoords]  = useState<{ lat: number; lng: number } | null>(null);
+  const [locStatus,   setLocStatus]   = useState<"idle" | "loading" | "granted" | "denied">("idle");
+  const categoryRef = useRef(initCategory);
   const [page,        setPage]        = useState(1);
 
   // AI Smart Search
@@ -78,14 +81,15 @@ function ServicesContent() {
 
   const PER_PAGE = 12;
 
-  const loadServices = (cat: string) => {
+  const loadServices = (cat: string, coords?: { lat: number; lng: number } | null) => {
     setLoading(true);
     setFetchError(false);
     const params = new URLSearchParams();
     if (cat !== "All") params.set("category", cat);
+    if (coords) { params.set("lat", String(coords.lat)); params.set("lng", String(coords.lng)); }
     const qs  = params.toString();
     const ctl = new AbortController();
-    const tid = setTimeout(() => ctl.abort(), 10000); // 10 s timeout
+    const tid = setTimeout(() => ctl.abort(), 10000);
     fetch(`${API}/clients/services/search${qs ? `?${qs}` : ""}`, { signal: ctl.signal })
       .then(r => r.json())
       .then(j => { if (j.status === "success") setServices(j.data || []); })
@@ -93,19 +97,35 @@ function ServicesContent() {
       .finally(() => { clearTimeout(tid); setLoading(false); });
   };
 
-  useEffect(() => { loadServices(category); }, [category]);
+  // Request geolocation once on mount — use ref so no searchParams dep needed
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    setLocStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserCoords(coords);
+        setLocStatus("granted");
+        loadServices(categoryRef.current, coords);
+      },
+      () => setLocStatus("denied"),
+      { timeout: 8000 }
+    );
+  }, []);
 
-  // Keep state in sync when searchParams change externally (e.g. from layout search / price filter)
+  // Sync state from URL then load; pass latest coords via functional updater
   useEffect(() => {
     const c   = searchParams.get("category") || "All";
     const s   = searchParams.get("search")   || "";
     const min = Number(searchParams.get("minPrice") || 0);
     const max = Number(searchParams.get("maxPrice") || 0);
+    categoryRef.current = c;
     setCategory(c);
     setSearch(s);
     setMinPrice(min);
     setMaxPrice(max);
     setPage(1);
+    setUserCoords(prev => { loadServices(c, prev); return prev; });
   }, [searchParams]);
 
   const filtered = services.filter(s => {
@@ -216,7 +236,15 @@ function ServicesContent() {
       {/* Hero */}
       <div className="svc-hero">
         <h1 className="svc-hero-h1">Browse All Services</h1>
-        <p className="svc-hero-sub">Find trusted professionals across South Africa</p>
+        <p className="svc-hero-sub" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {locStatus === "loading" ? (
+            <><Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> Detecting your location…</>
+          ) : locStatus === "granted" ? (
+            <><MapPin size={13} /> Showing services nearest to you</>
+          ) : (
+            "Find trusted professionals across South Africa"
+          )}
+        </p>
 
         {search && (
           <p style={{ color: "rgba(255,255,255,.6)", fontSize: 13, margin: "0 0 4px" }}>
@@ -333,7 +361,13 @@ function ServicesContent() {
                   <div className="svc-card-vendor">
                     {svc.vendorProfile?.businessName}
                     {svc.vendorProfile?.isVerified && <span className="svc-verified" style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={10}/>Verified</span>}
+                    {svc.distance != null && <span style={{marginLeft:"auto",color:"#6b7280",fontSize:11,display:"inline-flex",alignItems:"center",gap:2}}><MapPin size={10}/>{Number(svc.distance).toFixed(1)} km</span>}
                   </div>
+                  {svc.vendorProfile?.locationText && (
+                    <div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#6b7280",marginBottom:6}}>
+                      <MapPin size={10}/>{svc.vendorProfile.locationText}
+                    </div>
+                  )}
                   {svc.reviewCount > 0 && (
                     <div className="svc-stars">
                       <Stars rating={svc.avgRating} />
@@ -402,6 +436,11 @@ function ServicesContent() {
                   {svc.vendorProfile?.businessName || "Verified Provider"}
                   {svc.vendorProfile?.isVerified && <span className="svc-verified" style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={10}/>Verified</span>}
                 </div>
+                {svc.vendorProfile?.locationText && (
+                  <div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#6b7280",marginBottom:6}}>
+                    <MapPin size={10}/>{svc.vendorProfile.locationText}
+                  </div>
+                )}
                 {svc.reviewCount > 0 ? (
                   <div className="svc-stars">
                     <Stars rating={svc.avgRating} size={12} />

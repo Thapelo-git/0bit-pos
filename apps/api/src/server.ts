@@ -41,15 +41,21 @@ app.use(morgan(isProduction ? "combined" : "dev"));
 const allowedOrigins = [
   "http://localhost:3000",
   process.env.FRONTEND_URL ?? "",
+  ...(process.env.ADDITIONAL_ORIGINS ?? "").split(",").filter(Boolean),
 ].filter(Boolean);
+
+// Local-network pattern — allows any device on the same Wi-Fi (dev only)
+const localNetworkPattern = !isProduction
+  ? /^http:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)\d+\.\d+:\d+$/
+  : null;
 
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      const isAllowed = allowedOrigins.some((allowed) =>
-        origin.startsWith(allowed)
-      );
+      const isAllowed =
+        allowedOrigins.some((allowed) => origin.startsWith(allowed)) ||
+        (localNetworkPattern?.test(origin) ?? false);
       if (isAllowed) {
         callback(null, true);
       } else {

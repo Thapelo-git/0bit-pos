@@ -330,18 +330,19 @@ function CategorySlider() {
         </Link>
       </div>
 
-      {/* Category list on right accent panel */}
+      {/* Category list on right accent panel — click navigates to filtered services */}
       <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "26%", zIndex: 11, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 18px", gap: 4 }}>
         {SLIDER_ITEMS.map((s, i) => (
-          <button
+          <Link
             key={s.category}
+            href={`/services?category=${encodeURIComponent(s.category)}`}
             onClick={() => restart(i)}
-            style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: "7px 10px", borderRadius: 6, borderLeft: `3px solid ${i === active ? "#fff" : "rgba(255,255,255,.3)"}`, transition: "all .25s" }}
+            style={{ textDecoration: "none", background: "none", display: "block", padding: "7px 10px", borderRadius: 6, borderLeft: `3px solid ${i === active ? "#fff" : "rgba(255,255,255,.3)"}`, transition: "all .25s" }}
           >
             <div style={{ color: i === active ? "#fff" : "rgba(255,255,255,.5)", fontSize: 11, fontWeight: i === active ? 800 : 500, lineHeight: 1.35, transition: "color .25s" }}>
               {s.category}
             </div>
-          </button>
+          </Link>
         ))}
       </div>
 
