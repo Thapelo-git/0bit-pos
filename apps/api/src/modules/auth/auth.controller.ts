@@ -6,6 +6,7 @@ import { setAuthCookie, clearAuthCookie } from "../../utils/cookie.util.js";
 import { catchAsync } from "../../utils/catchAsync.js";
 import { AppError }   from "../../utils/appError.js";
 import { sendVerificationEmail, sendPasswordResetEmail, sendInviteEmail } from "../../services/mail.service.js";
+import { notifyAdmins } from "../../utils/notify.js";
 
 const authService = new AuthService();
 
@@ -284,9 +285,13 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
+  if (targetRole === "VENDOR") {
+    await notifyAdmins("New Vendor Application", `${businessName || user.email} applied to join kasiFix as a vendor. Review their application.`, "/admin/vendors");
+  }
+
   return res.status(HttpStatus.CREATED).json({
     status:  "success",
-    message: targetRole === "VENDOR" 
+    message: targetRole === "VENDOR"
       ? "Vendor registration successful! Your application is pending admin approval."
       : "Registration successful. Welcome aboard!",
   });

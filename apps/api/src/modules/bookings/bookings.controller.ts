@@ -3,13 +3,17 @@ import { prisma } from "@repo/database";
 import { HttpStatus } from "@repo/types";
 import { catchAsync } from "../../utils/catchAsync.js";
 import { AppError } from "../../utils/appError.js";
+import { notify } from "../../utils/notify.js";
 
 // ── Create single Booking ────────────────────────────────────────────────────
 export const createBooking = catchAsync(async (req: Request, res: Response) => {
   const { serviceId } = req.body;
   if (!serviceId) throw new AppError("Service ID is required", HttpStatus.BAD_REQUEST);
 
-  const service = await prisma.service.findUnique({ where: { id: serviceId } });
+  const service = await prisma.service.findUnique({
+    where: { id: serviceId },
+    include: { vendorProfile: { select: { userId: true } } },
+  });
   if (!service) throw new AppError("Service not found", HttpStatus.NOT_FOUND);
 
   const booking = await prisma.booking.create({
@@ -20,6 +24,8 @@ export const createBooking = catchAsync(async (req: Request, res: Response) => {
       status:      "PENDING",
     },
   });
+
+  await notify(service.vendorProfile.userId, "New Booking Received!", `You have a new booking request for "${service.name}". Accept or decline it from your dashboard.`, "/dashboard");
 
   return res.status(HttpStatus.CREATED).json({ status: "success", data: booking });
 });
@@ -44,7 +50,7 @@ export const checkout = catchAsync(async (req: Request, res: Response) => {
   const serviceIds = [...new Set(items.map(i => i.serviceId))];
   const services   = await prisma.service.findMany({
     where: { id: { in: serviceIds }, isActive: true },
-    include: { vendorProfile: { select: { businessName: true } } },
+    include: { vendorProfile: { select: { businessName: true, userId: true } } },
   });
 
   if (services.length !== serviceIds.length)
@@ -72,6 +78,20 @@ export const checkout = catchAsync(async (req: Request, res: Response) => {
   );
 
   const total = bookings.reduce((s, b) => s + b.totalAmount, 0);
+
+  // Notify each vendor of their new booking(s)
+  const vendorServiceMap = new Map<string, string[]>();
+  for (const svc of services) {
+    const uid = (svc.vendorProfile as { businessName: string; userId: string } | null)?.userId;
+    if (!uid) continue;
+    if (!vendorServiceMap.has(uid)) vendorServiceMap.set(uid, []);
+    vendorServiceMap.get(uid)!.push(svc.name);
+  }
+  await Promise.all(
+    [...vendorServiceMap.entries()].map(([vendorId, names]) =>
+      notify(vendorId, "New Booking Received!", `You have ${names.length} new booking request${names.length > 1 ? "s" : ""}: ${names.join(", ")}.`, "/dashboard")
+    )
+  );
 
   // Save client phone to their profile so vendors can contact them
   if (phone?.trim()) {

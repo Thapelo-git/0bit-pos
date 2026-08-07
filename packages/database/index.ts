@@ -22,9 +22,15 @@ if (!connectionString) {
 
 const pool = new pg.Pool({
   connectionString,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+  max: 3,                          // free tier: keep connections low
+  idleTimeoutMillis: 10000,        // release idle connections quickly
+  connectionTimeoutMillis: 15000,  // give more time on cold reconnect
+  allowExitOnIdle: false,
+});
+
+// Prevent unhandled pool errors from crashing the process
+pool.on("error", (err) => {
+  console.error("[db-pool] idle client error:", err.message);
 });
 
 const adapter = new PrismaPg(pool);

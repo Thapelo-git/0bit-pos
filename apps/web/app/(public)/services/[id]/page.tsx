@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCart } from "../../../../src/shared/context/CartContext";
+import { CheckCircle2, Shield, Clock, Star, MapPin, Lock, RefreshCw, Phone, Heart, X } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -10,7 +11,7 @@ const RED  = "#DC143C";
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=1200&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1200&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=1200&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=1200&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=1200&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=1200&auto=format&fit=crop",
 };
@@ -231,7 +232,7 @@ export default function ServiceDetailPage() {
 
   if (!service) return (
     <div style={{ padding: "60px 20px", textAlign: "center", color: "#71717A" }}>
-      <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>Loading service details...
+      <div style={{ marginBottom: "12px", display:"flex", justifyContent:"center" }}><Clock size={32}/></div>Loading service details...
     </div>
   );
 
@@ -369,7 +370,7 @@ export default function ServiceDetailPage() {
           />
           {isVerified && (
             <div style={{ position: "absolute", top: 14, left: 14, background: "#15803d", color: "#fff", fontSize: "12px", fontWeight: 800, padding: "5px 12px", borderRadius: "6px", display: "flex", alignItems: "center", gap: 6 }}>
-              ✓ kasiFix Verified Provider
+              <CheckCircle2 size={14}/> kasiFix Verified Provider
             </div>
           )}
         </div>
@@ -397,10 +398,10 @@ export default function ServiceDetailPage() {
 
             {/* Trust badges */}
             <div className="badge-row">
-              {isVerified && <span className="badge badge-green">✓ kasiFix Verified</span>}
-              <span className="badge badge-blue">🛡 Secure Booking</span>
-              <span className="badge badge-amber">⏱ Quick Response</span>
-              <span className="badge badge-green">✅ Satisfaction Guaranteed</span>
+              {isVerified && <span className="badge badge-green"><CheckCircle2 size={12}/>kasiFix Verified</span>}
+              <span className="badge badge-blue"><Shield size={12}/>Secure Booking</span>
+              <span className="badge badge-amber"><Clock size={12}/>Quick Response</span>
+              <span className="badge badge-green"><CheckCircle2 size={12}/>Satisfaction Guaranteed</span>
             </div>
 
             <p className="detail-desc">
@@ -418,7 +419,7 @@ export default function ServiceDetailPage() {
                 "Easy rebooking if needed",
               ].map(item => (
                 <div key={item} style={{ display: "flex", gap: 10, marginBottom: 10, fontSize: 14, color: "#333" }}>
-                  <span style={{ color: "#16a34a", fontWeight: 700, flexShrink: 0 }}>✓</span>
+                  <CheckCircle2 size={16} color="#16a34a" style={{ flexShrink: 0, marginTop: 2 }}/>
                   <span>{item}</span>
                 </div>
               ))}
@@ -469,7 +470,7 @@ export default function ServiceDetailPage() {
               </>
             ) : (
               <div style={{ background: "#f8f9fa", borderRadius: 12, padding: "32px 20px", textAlign: "center", marginBottom: 24, color: "#71717A" }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>⭐</div>
+                <div style={{ marginBottom: 12, display:"flex", justifyContent:"center" }}><Star size={36} color="#f59e0b"/></div>
                 <div style={{ fontWeight: 700, fontSize: 15, color: "#374151", marginBottom: 6 }}>No reviews yet</div>
                 <div style={{ fontSize: 13 }}>Be the first to review this service after booking.</div>
               </div>
@@ -542,7 +543,7 @@ export default function ServiceDetailPage() {
               </div>
               {isQuotable ? (
                 <div className="booking-per-quote">
-                  📐 Price depends on property size — get an instant quote below
+                  Price depends on property size — get an instant quote below
                 </div>
               ) : (
                 <div className="booking-per">Starting price per session</div>
@@ -570,10 +571,10 @@ export default function ServiceDetailPage() {
               {isQuotable ? (
                 <>
                   <button className="quote-btn" onClick={() => { setQuoteOpen(true); setQuoteStep("form"); }}>
-                    📋 Get My Quote
+                    Get My Quote
                   </button>
                   {cartAdded ? (
-                    <Link href="/cart" className="in-cart-btn" style={{ marginTop: "10px" }}>✓ Added — View Booking</Link>
+                    <Link href="/cart" className="in-cart-btn" style={{ marginTop: "10px", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}><CheckCircle2 size={16}/>Added — View Booking</Link>
                   ) : (
                     <button className="add-cart-btn" onClick={addToBooking} style={{ background: RED, opacity: 0.85, marginTop: "10px" }}>
                       + Add at Base Price
@@ -583,10 +584,10 @@ export default function ServiceDetailPage() {
               ) : (
                 <>
                   <button className="add-cart-btn" onClick={bookNow} style={{ background: "#0A0A0A", marginTop: "16px" }}>
-                    ⚡ Book Now
+                    Book Now
                   </button>
                   {cartAdded ? (
-                    <Link href="/cart" className="in-cart-btn" style={{ marginTop: "10px" }}>✓ Added — View Booking</Link>
+                    <Link href="/cart" className="in-cart-btn" style={{ marginTop: "10px", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}><CheckCircle2 size={16}/>Added — View Booking</Link>
                   ) : (
                     <button className="add-cart-btn" onClick={addToBooking} style={{ background: RED, opacity: 0.9 }}>
                       + Add to Booking
@@ -596,7 +597,7 @@ export default function ServiceDetailPage() {
               )}
 
               <button className={`fav-toggle${isFav ? " on" : ""}`} onClick={toggleFav}>
-                {isFav ? "♥ Saved to Favourites" : "♡ Save to Favourites"}
+                {isFav ? <><Heart size={16} fill="currentColor"/> Saved to Favourites</> : <><Heart size={16}/> Save to Favourites</>}
               </button>
 
               {!isLoggedIn && (
@@ -607,7 +608,7 @@ export default function ServiceDetailPage() {
 
               {cartToast && (
                 <div className="cart-toast">
-                  ✓ Added to booking!
+                  <CheckCircle2 size={16}/> Added to booking!
                   <Link href="/cart" style={{ color: "#f59e0b", fontWeight: 800, textDecoration: "none", fontSize: 13 }}>View Booking →</Link>
                 </div>
               )}
@@ -615,10 +616,10 @@ export default function ServiceDetailPage() {
               {/* Platform guarantees */}
               <div className="guarantees">
                 {[
-                  { icon: "🛡", text: "Secure & encrypted payment" },
-                  { icon: "✅", text: "Satisfaction guaranteed" },
-                  { icon: "📞", text: "24/7 customer support" },
-                  { icon: "🔄", text: "Free rebooking if unsatisfied" },
+                  { icon: <Shield size={14}/>, text: "Secure & encrypted payment" },
+                  { icon: <CheckCircle2 size={14}/>, text: "Satisfaction guaranteed" },
+                  { icon: <Phone size={14}/>, text: "24/7 customer support" },
+                  { icon: <RefreshCw size={14}/>, text: "Free rebooking if unsatisfied" },
                 ].map(g => (
                   <div key={g.text} className="guarantee-item">
                     <span>{g.icon}</span><span>{g.text}</span>
@@ -632,15 +633,15 @@ export default function ServiceDetailPage() {
               <div className="vt-title">About the Provider</div>
               {isVerified && (
                 <div className="vt-row">
-                  <div className="vt-icon">✓</div>
+                  <div className="vt-icon"><CheckCircle2 size={14} color="#15803d"/></div>
                   <span style={{ color: "#15803d", fontWeight: 700 }}>kasiFix Verified Business</span>
                 </div>
               )}
               {[
-                { icon: "🪪", text: "ID & credentials verified" },
-                { icon: "🔒", text: "Background checked" },
-                { icon: "⭐", text: avgRating !== null ? `${avgRating.toFixed(1)} average rating` : "New provider" },
-                { icon: "📍", text: service.vendorProfile?.locationText || "South Africa" },
+                { icon: <CheckCircle2 size={14}/>, text: "ID & credentials verified" },
+                { icon: <Lock size={14}/>, text: "Background checked" },
+                { icon: <Star size={14}/>, text: avgRating !== null ? `${avgRating.toFixed(1)} average rating` : "New provider" },
+                { icon: <MapPin size={14}/>, text: service.vendorProfile?.locationText || "South Africa" },
               ].map(item => (
                 <div key={item.text} className="vt-row">
                   <div className="vt-icon">{item.icon}</div>
@@ -660,9 +661,9 @@ export default function ServiceDetailPage() {
 
             <div className="qt-hdr">
               <h3>
-                {service?.category === "Home Cleaning" ? "🧹 Get a Cleaning Quote" : "🔧 Get a Trade Quote"}
+                {service?.category === "Home Cleaning" ? "Get a Cleaning Quote" : "Get a Trade Quote"}
               </h3>
-              <button className="qt-close" onClick={() => setQuoteOpen(false)}>✕</button>
+              <button className="qt-close" onClick={() => setQuoteOpen(false)} style={{display:"flex",alignItems:"center",justifyContent:"center"}}><X size={20}/></button>
             </div>
 
             <div className="qt-body">
@@ -789,7 +790,7 @@ export default function ServiceDetailPage() {
                   </div>
 
                   <button className="qt-book-btn" onClick={bookWithQuote}>
-                    ⚡ Book Now — R {quotedPrice.toFixed(2)}
+                    Book Now — R {quotedPrice.toFixed(2)}
                   </button>
                   <button className="qt-back" onClick={() => setQuoteStep("form")}>
                     ← Change details

@@ -175,6 +175,7 @@ export const ServiceScalarFieldEnum = {
   isActive: 'isActive',
   isDeal: 'isDeal',
   originalPrice: 'originalPrice',
+  dealExpiresAt: 'dealExpiresAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -204,6 +205,8 @@ export const BookingScalarFieldEnum = {
   notes: 'notes',
   address: 'address',
   paymentMethod: 'paymentMethod',
+  payoutStatus: 'payoutStatus',
+  payoutDate: 'payoutDate',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

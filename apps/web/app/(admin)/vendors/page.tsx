@@ -1,5 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Store, Wrench, KeyRound, CheckCircle2, AlertTriangle, MapPin, Search, X, Clock, Bell, CheckCheck, Trash2, Banknote, RefreshCw } from "lucide-react";
+
 
 const API             = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED             = "#DC143C";
@@ -8,7 +11,7 @@ const VENDOR_PAGE_SIZE = 10;
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=400&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=400&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=400&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=400&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=400&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=400&auto=format&fit=crop",
   "Other Local Services":             "https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=400&auto=format&fit=crop",
@@ -18,7 +21,7 @@ function catImg(category: string) {
   return CATEGORY_IMAGES[category] || CATEGORY_IMAGES["Other Local Services"];
 }
 
-type AdminTab = "vendors" | "services" | "password";
+type AdminTab = "vendors" | "services" | "payouts" | "password" | "notifications";
 
 interface VendorRow {
   id: string;
@@ -48,6 +51,7 @@ interface ServiceRow {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [tab,        setTab]        = useState<AdminTab>("vendors");
   const [vendors,    setVendors]    = useState<VendorRow[]>([]);
   const [services,   setServices]   = useState<ServiceRow[]>([]);
@@ -55,11 +59,87 @@ export default function AdminDashboard() {
   const [loading,    setLoading]    = useState(true);
   const [actionId,   setActionId]   = useState<string | null>(null);
   const [error,      setError]      = useState<string | null>(null);
+  const [authChecked,  setAuthChecked]  = useState(false);
   const [vendorPage,   setVendorPage]   = useState(1);
   const [selectedSvc,  setSelectedSvc]  = useState<ServiceRow | null>(null);
   const [pwForm,       setPwForm]       = useState({ current: "", next: "", confirm: "" });
   const [pwMsg,        setPwMsg]        = useState<{ ok: boolean; text: string } | null>(null);
   const [pwBusy,       setPwBusy]       = useState(false);
+
+  // Notifications
+  const [notifs,       setNotifs]      = useState<{ id: string; title: string; body: string; read: boolean; link?: string | null; createdAt: string }[]>([]);
+  const [notifUnread,  setNotifUnread] = useState(0);
+  const [notifBusy,    setNotifBusy]   = useState(false);
+
+  // Payouts
+  interface Payout { id: string; clientName: string; serviceName: string; totalAmount: number; vendorAmount: number; paymentMethod: string | null; completedAt: string; vendor: { profileId: string; businessName: string; bankDetails: string | null; phone: string | null; }; }
+  const [payouts,      setPayouts]     = useState<Payout[]>([]);
+  const [totalOwed,    setTotalOwed]   = useState(0);
+  const [payoutsBusy,  setPayoutsBusy] = useState<Record<string, boolean>>({});
+  const [payoutsLoaded, setPayoutsLoaded] = useState(false);
+
+  const loadPayouts = async () => {
+    try {
+      const r = await fetch(`${API}/admin/payouts`, { credentials: "include" });
+      const j = await r.json();
+      if (j.status === "success") { setPayouts(j.data.payouts); setTotalOwed(j.data.totalOwed); }
+    } catch {}
+    setPayoutsLoaded(true);
+  };
+
+  useEffect(() => { if (tab === "payouts" && !payoutsLoaded) loadPayouts(); }, [tab, payoutsLoaded]);
+
+  const markPaid = async (bookingId: string) => {
+    setPayoutsBusy(p => ({ ...p, [bookingId]: true }));
+    try {
+      const r = await fetch(`${API}/admin/payouts/${bookingId}/mark-paid`, { method: "PATCH", credentials: "include" });
+      const j = await r.json();
+      if (j.status === "success") {
+        setPayouts(ps => ps.filter(p => p.id !== bookingId));
+        setTotalOwed(t => t - (payouts.find(p => p.id === bookingId)?.vendorAmount ?? 0));
+      }
+    } catch {}
+    setPayoutsBusy(p => ({ ...p, [bookingId]: false }));
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await fetch(`${API}/notifications`, { credentials: "include" });
+        if (!r.ok) return;
+        const j = await r.json();
+        setNotifs(j.data?.notifications ?? []);
+        setNotifUnread(j.data?.unreadCount ?? 0);
+      } catch {}
+    };
+    load();
+    const id = setInterval(load, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const markAllNotifs = async () => {
+    setNotifBusy(true);
+    try {
+      await fetch(`${API}/notifications/read-all`, { method: "PATCH", credentials: "include" });
+      setNotifs(ns => ns.map(n => ({ ...n, read: true })));
+      setNotifUnread(0);
+    } catch {} finally { setNotifBusy(false); }
+  };
+
+  const deleteNotif = async (id: string) => {
+    await fetch(`${API}/notifications/${id}`, { method: "DELETE", credentials: "include" }).catch(() => {});
+    const removed = notifs.find(n => n.id === id);
+    setNotifs(ns => ns.filter(n => n.id !== id));
+    if (removed && !removed.read) setNotifUnread(u => Math.max(0, u - 1));
+  };
+
+  const timeAgo = (iso: string) => {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)    return "just now";
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
 
   // Metrics derived from vendors
   const metrics = {
@@ -75,6 +155,28 @@ export default function AdminDashboard() {
     pending: services.filter(s => !s.isActive).length,
     live:    services.filter(s => s.isActive).length,
   };
+
+  // Auth guard — block UI until session is confirmed
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000); // 8s max wait
+    fetch(`${API}/auth/me`, { credentials: "include", signal: ctrl.signal })
+      .then(r => {
+        clearTimeout(timer);
+        if (r.status === 401) { router.replace("/login"); return null; }
+        return r.json();
+      })
+      .then(j => {
+        if (!j) return;
+        const role = j.data?.user?.role;
+        if (role === "SUPER_ADMIN" || role === "ADMIN") {
+          setAuthChecked(true);
+        } else {
+          router.replace("/login");
+        }
+      })
+      .catch(() => { clearTimeout(timer); router.replace("/login"); });
+  }, [router]);
 
   // Load vendors
   useEffect(() => {
@@ -170,6 +272,15 @@ export default function AdminDashboard() {
     );
   });
 
+  if (!authChecked) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f172a", flexDirection: "column", gap: 16 }}>
+        <div style={{ color: RED, fontSize: 28, fontWeight: 900 }}>kasiFix</div>
+        <div style={{ color: "#94a3b8", fontSize: 14 }}>Verifying session…</div>
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{`
@@ -235,8 +346,9 @@ export default function AdminDashboard() {
         /* Service cards grid */
         .svc-grid         { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; }
         .svc-card         { background:#fff; border-radius:14px; overflow:hidden; border:1.5px solid #e2e8f0; }
-        .svc-card-img     { height:150px; position:relative; overflow:hidden; background:#f1f5f9; }
-        .svc-card-img img { width:100%; height:100%; object-fit:cover; display:block; }
+        .svc-card-img     { position:relative; height:150px; overflow:hidden; background:#111; }
+        .svc-card-img .img-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:blur(14px) brightness(.5); transform:scale(1.15); display:block; }
+        .svc-card-img .img-fg { position:relative; width:100%; height:100%; object-fit:contain; display:block; z-index:1; }
         .svc-card-status  { position:absolute; top:10px; right:10px; padding:3px 10px; border-radius:4px; font-size:10px; font-weight:800; }
         .svc-card-body    { padding:16px; }
         .svc-card-cat     { font-size:11px; font-weight:700; color:${RED}; margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px; }
@@ -269,13 +381,29 @@ export default function AdminDashboard() {
           <div className="adm-logo">kasiFix Admin</div>
           <nav className="adm-nav">
             <button className={`adm-nav-btn${tab === "vendors" ? " on" : ""}`} onClick={() => { setTab("vendors"); setSearch(""); }}>
-              🏪 Service Providers
+              <Store size={16} /> Service Providers
             </button>
             <button className={`adm-nav-btn${tab === "services" ? " on" : ""}`} onClick={() => { setTab("services"); setSearch(""); }}>
-              🛠 Service Listings
+              <Wrench size={16} /> Service Listings
+            </button>
+            <button className={`adm-nav-btn${tab === "payouts" ? " on" : ""}`} onClick={() => { setTab("payouts"); setSearch(""); }} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Banknote size={16} /> Payouts
+              {payouts.length > 0 && (
+                <span style={{ marginLeft: "auto", background: "#16a34a", color: "#fff", borderRadius: "50%", minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, padding: "0 3px" }}>
+                  {payouts.length}
+                </span>
+              )}
             </button>
             <button className={`adm-nav-btn${tab === "password" ? " on" : ""}`} onClick={() => { setTab("password"); setSearch(""); setPwMsg(null); }}>
-              🔑 Change Password
+              <KeyRound size={16} /> Change Password
+            </button>
+            <button className={`adm-nav-btn${tab === "notifications" ? " on" : ""}`} onClick={() => { setTab("notifications"); setSearch(""); }} style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }}>
+              <Bell size={16} /> Notifications
+              {notifUnread > 0 && (
+                <span style={{ marginLeft: "auto", background: RED, color: "#fff", borderRadius: "50%", minWidth: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, padding: "0 3px" }}>
+                  {notifUnread > 9 ? "9+" : notifUnread}
+                </span>
+              )}
             </button>
           </nav>
           <div className="adm-foot">
@@ -319,14 +447,18 @@ export default function AdminDashboard() {
 
           <div className="adm-content">
             <h1 className="adm-title">
-              {tab === "vendors" ? "Service Providers" : tab === "services" ? "Service Listings" : "Change Password"}
+              {tab === "vendors"       ? "Service Providers"
+               : tab === "services"   ? "Service Listings"
+               : tab === "payouts"    ? "Vendor Payouts"
+               : tab === "notifications" ? "Notifications"
+               : "Change Password"}
             </h1>
             <p className="adm-sub">
-              {tab === "vendors"
-                ? "Approve, suspend, or manage all registered service providers"
-                : tab === "services"
-                ? "Review and approve service listings submitted by vendors"
-                : "Update your admin account password"}
+              {tab === "vendors"       ? "Approve, suspend, or manage all registered service providers"
+               : tab === "services"   ? "Review and approve service listings submitted by vendors"
+               : tab === "payouts"    ? "Pay out vendors for completed bookings via EFT"
+               : tab === "notifications" ? "Your admin notifications"
+               : "Update your admin account password"}
             </p>
 
             {error && (
@@ -335,18 +467,17 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Tabs */}
-            <div className="adm-tabs">
-              <button className={`adm-tab${tab === "vendors" ? " on" : ""}`} onClick={() => { setTab("vendors"); setSearch(""); }}>
-                🏪 Service Providers {vendors.length > 0 && `(${vendors.length})`}
-              </button>
-              <button className={`adm-tab${tab === "services" ? " on" : ""}`} onClick={() => { setTab("services"); setSearch(""); }}>
-                🛠 Service Listings {svcMetrics.pending > 0 && <span style={{ marginLeft: "6px", background: RED, color: "#fff", borderRadius: "10px", padding: "1px 7px", fontSize: "11px" }}>{svcMetrics.pending}</span>}
-              </button>
-              <button className={`adm-tab${tab === "password" ? " on" : ""}`} onClick={() => { setTab("password"); setSearch(""); setPwMsg(null); }}>
-                🔑 Change Password
-              </button>
-            </div>
+            {/* Tabs — only show for vendors / services */}
+            {(tab === "vendors" || tab === "services") && (
+              <div className="adm-tabs">
+                <button className={`adm-tab${tab === "vendors" ? " on" : ""}`} onClick={() => { setTab("vendors"); setSearch(""); }}>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}><Store size={16}/>Service Providers {vendors.length > 0 && `(${vendors.length})`}</span>
+                </button>
+                <button className={`adm-tab${tab === "services" ? " on" : ""}`} onClick={() => { setTab("services"); setSearch(""); }}>
+                  <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}><Wrench size={16}/>Service Listings {svcMetrics.pending > 0 && <span style={{ marginLeft: "6px", background: RED, color: "#fff", borderRadius: "10px", padding: "1px 7px", fontSize: "11px" }}>{svcMetrics.pending}</span>}</span>
+                </button>
+              </div>
+            )}
 
             {/* ── VENDORS TAB ──────────────────────────────────────── */}
             {tab === "vendors" && (
@@ -416,7 +547,7 @@ export default function AdminDashboard() {
                           </td>
                           <td>
                             {v.vendorProfile?.isVerified
-                              ? <span className="badge badge-green">✓ Verified</span>
+                              ? <span className="badge badge-green" style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><CheckCircle2 size={12}/>Verified</span>
                               : <span className="badge badge-amber">Unverified</span>}
                           </td>
                           <td style={{ fontWeight: 700, color: RED }}>R {(v.revenueEarned ?? 0).toFixed(2)}</td>
@@ -506,8 +637,8 @@ export default function AdminDashboard() {
                     style={{ padding: "10px 16px", border: "1.5px solid #e2e8f0", borderRadius: "8px", fontSize: "14px", outline: "none", width: "280px" }}
                   />
                   {svcMetrics.pending > 0 && (
-                    <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: 600 }}>
-                      ⚠️ {svcMetrics.pending} service{svcMetrics.pending !== 1 ? "s" : ""} pending your approval
+                    <div style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#92400e", padding: "8px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: 600, display:"inline-flex", alignItems:"center", gap:"6px" }}>
+                      <AlertTriangle size={16}/> {svcMetrics.pending} service{svcMetrics.pending !== 1 ? "s" : ""} pending your approval
                     </div>
                   )}
                 </div>
@@ -522,11 +653,8 @@ export default function AdminDashboard() {
                     {[...filteredServices].sort((a, b) => (a.isActive === b.isActive ? 0 : a.isActive ? 1 : -1)).map(svc => (
                       <div key={svc.id} className="svc-card">
                         <div className="svc-card-img">
-                          <img
-                            src={svc.imageUrl || catImg(svc.category)}
-                            alt={svc.name}
-                            onError={e => { (e.target as HTMLImageElement).src = catImg(svc.category); }}
-                          />
+                          <img className="img-bg" src={svc.imageUrl || catImg(svc.category)} alt="" aria-hidden />
+                          <img className="img-fg" src={svc.imageUrl || catImg(svc.category)} alt={svc.name} onError={e => { (e.target as HTMLImageElement).src = catImg(svc.category); }} />
                           <span
                             className="svc-card-status"
                             style={{
@@ -534,17 +662,17 @@ export default function AdminDashboard() {
                               color: "#fff"
                             }}
                           >
-                            {svc.isActive ? "✓ LIVE" : "⏳ PENDING"}
+                            {svc.isActive ? <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><CheckCircle2 size={12}/>LIVE</span> : <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><Clock size={12}/>PENDING</span>}
                           </span>
                         </div>
                         <div className="svc-card-body">
                           <div className="svc-card-cat">{svc.category}</div>
                           <div className="svc-card-name">{svc.name}</div>
-                          <div className="svc-card-vendor">
-                            🏪 {svc.vendorProfile?.businessName || "Unknown Vendor"}
+                          <div className="svc-card-vendor" style={{display:"flex",alignItems:"center",gap:"5px"}}>
+                            <Store size={12}/> {svc.vendorProfile?.businessName || "Unknown Vendor"}
                           </div>
                           {svc.vendorProfile?.locationText && (
-                            <div className="svc-card-loc">📍 {svc.vendorProfile.locationText}</div>
+                            <div className="svc-card-loc" style={{display:"flex",alignItems:"center",gap:"5px"}}><MapPin size={12}/> {svc.vendorProfile.locationText}</div>
                           )}
                           <div className="svc-card-price">R {Number(svc.price).toFixed(2)}</div>
                           {svc.description && (
@@ -558,7 +686,7 @@ export default function AdminDashboard() {
                               style={{ background: "#f1f5f9", color: "#1e293b", flex: 1, padding: "10px" }}
                               onClick={() => setSelectedSvc(svc)}
                             >
-                              🔍 View Details
+                              <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}><Search size={14}/>View Details</span>
                             </button>
                             {!svc.isActive ? (
                               <button
@@ -567,7 +695,7 @@ export default function AdminDashboard() {
                                 onClick={() => updateServiceStatus(svc.id, "approve")}
                                 style={{ flex: 1, padding: "10px" }}
                               >
-                                {actionId === svc.id ? "..." : "✓ Approve"}
+                                {actionId === svc.id ? "..." : <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}><CheckCircle2 size={14}/>Approve</span>}
                               </button>
                             ) : (
                               <button
@@ -576,7 +704,7 @@ export default function AdminDashboard() {
                                 onClick={() => updateServiceStatus(svc.id, "reject")}
                                 style={{ flex: 1, padding: "10px" }}
                               >
-                                {actionId === svc.id ? "..." : "✗ Offline"}
+                                {actionId === svc.id ? "..." : <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}><X size={14}/>Offline</span>}
                               </button>
                             )}
                           </div>
@@ -629,7 +757,7 @@ export default function AdminDashboard() {
 
                   {pwMsg && (
                     <div style={{ background: pwMsg.ok ? "#d1fae5" : "#fee2e2", color: pwMsg.ok ? "#065f46" : "#991b1b", border: `1px solid ${pwMsg.ok ? "#6ee7b7" : "#fca5a5"}`, borderRadius: 8, padding: "12px 16px", fontWeight: 600, fontSize: 14 }}>
-                      {pwMsg.ok ? "✓ " : "✗ "}{pwMsg.text}
+                      <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}>{pwMsg.ok ? <CheckCircle2 size={14}/> : <X size={14}/>}{pwMsg.text}</span>
                     </div>
                   )}
 
@@ -659,6 +787,135 @@ export default function AdminDashboard() {
                 </form>
               </div>
             )}
+
+            {/* ── PAYOUTS TAB ───────────────────────────────────────── */}
+            {tab === "payouts" && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+                  <div>
+                    <h2 style={{ fontSize: 20, fontWeight: 900, color: "#0f172a", margin: 0 }}>Pending Payouts</h2>
+                    <p style={{ fontSize: 13, color: "#71717A", margin: "4px 0 0" }}>
+                      Completed bookings where vendors are waiting for their EFT payment
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: 10, padding: "10px 18px", textAlign: "center" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#065f46", textTransform: "uppercase", letterSpacing: ".4px" }}>Total Owed</div>
+                      <div style={{ fontSize: 22, fontWeight: 900, color: "#065f46" }}>R {totalOwed.toFixed(2)}</div>
+                    </div>
+                    <button onClick={() => { setPayoutsLoaded(false); loadPayouts(); }} style={{ background: "none", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "9px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13 }}>
+                      <RefreshCw size={14} /> Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {payouts.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "60px 20px", background: "#f8fafc", borderRadius: 14, border: "1.5px solid #e2e8f0" }}>
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}><CheckCircle2 size={48} color="#16a34a" /></div>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", marginBottom: 6 }}>All paid out!</div>
+                    <div style={{ fontSize: 13, color: "#71717A" }}>No pending payouts right now.</div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {payouts.map(p => (
+                      <div key={p.id} style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "18px 20px", display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontWeight: 800, fontSize: 15, color: "#0f172a" }}>{p.vendor.businessName}</span>
+                            <span style={{ background: "#fef3c7", color: "#92400e", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>PENDING</span>
+                          </div>
+                          <div style={{ fontSize: 13, color: "#374151", marginBottom: 4 }}>
+                            <strong>Service:</strong> {p.serviceName} &nbsp;·&nbsp; <strong>Customer:</strong> {p.clientName}
+                          </div>
+                          <div style={{ fontSize: 13, color: "#374151", marginBottom: 6 }}>
+                            <strong>Payment:</strong> {p.paymentMethod === "CARD" ? "Credit/Debit Card" : p.paymentMethod === "EFT" ? "EFT / Bank Transfer" : p.paymentMethod === "CASH" ? "Cash on Delivery" : p.paymentMethod || "—"}
+                            &nbsp;·&nbsp; <strong>Completed:</strong> {new Date(p.completedAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
+                          </div>
+                          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px", fontSize: 12.5 }}>
+                            <div style={{ fontWeight: 700, color: "#374151", marginBottom: 4 }}>Bank Details</div>
+                            <div style={{ color: p.vendor.bankDetails ? "#0f172a" : "#9ca3af", fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+                              {p.vendor.bankDetails || "No bank details provided — contact vendor"}
+                            </div>
+                            {p.vendor.phone && <div style={{ color: "#374151", marginTop: 4 }}>📞 {p.vendor.phone}</div>}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 11, color: "#71717A", fontWeight: 600 }}>Booking Total</div>
+                            <div style={{ fontSize: 16, fontWeight: 800, color: "#374151" }}>R {Number(p.totalAmount).toFixed(2)}</div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 11, color: "#71717A", fontWeight: 600 }}>Platform Fee (R30)</div>
+                            <div style={{ fontSize: 13, color: RED, fontWeight: 700 }}>− R 30.00</div>
+                          </div>
+                          <div style={{ textAlign: "right", borderTop: "1.5px solid #e2e8f0", paddingTop: 6 }}>
+                            <div style={{ fontSize: 11, color: "#065f46", fontWeight: 700, textTransform: "uppercase" }}>Pay Vendor</div>
+                            <div style={{ fontSize: 22, fontWeight: 900, color: "#065f46" }}>R {Number(p.vendorAmount).toFixed(2)}</div>
+                          </div>
+                          <button
+                            disabled={!!payoutsBusy[p.id]}
+                            onClick={() => markPaid(p.id)}
+                            style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontWeight: 800, fontSize: 13, cursor: "pointer", opacity: payoutsBusy[p.id] ? .6 : 1, display: "flex", alignItems: "center", gap: 6 }}
+                          >
+                            <CheckCircle2 size={14} />
+                            {payoutsBusy[p.id] ? "Processing…" : "Mark as Paid"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── NOTIFICATIONS TAB ─────────────────────────────────── */}
+            {tab === "notifications" && (
+              <div style={{ maxWidth: 660 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#1e293b" }}>Notifications</h2>
+                  {notifUnread > 0 && (
+                    <button
+                      onClick={markAllNotifs}
+                      disabled={notifBusy}
+                      style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: `1.5px solid ${RED}`, borderRadius: 8, color: RED, fontWeight: 700, fontSize: 13, padding: "7px 14px", cursor: "pointer" }}
+                    >
+                      <CheckCheck size={15}/> Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {notifs.length === 0 ? (
+                  <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", padding: "56px 32px", textAlign: "center", color: "#94a3b8" }}>
+                    <Bell size={40} style={{ marginBottom: 12, opacity: .35 }}/>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>No notifications yet</p>
+                  </div>
+                ) : (
+                  <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+                    {notifs.map((n, i) => (
+                      <div key={n.id} style={{
+                        display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 20px",
+                        background: n.read ? "#fff" : "#fff8f8",
+                        borderBottom: i < notifs.length - 1 ? "1px solid #f1f5f9" : "none",
+                      }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: n.read ? "transparent" : RED, marginTop: 7, flexShrink: 0 }}/>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: n.read ? 600 : 800, fontSize: 14, color: "#1e293b", marginBottom: 4 }}>{n.title}</div>
+                          <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.55 }}>{n.body}</div>
+                          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>{timeAgo(n.createdAt)}</div>
+                        </div>
+                        <button
+                          onClick={() => deleteNotif(n.id)}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#cbd5e1", padding: 4, borderRadius: 4, flexShrink: 0 }}
+                          title="Delete"
+                        >
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -676,7 +933,7 @@ export default function AdminDashboard() {
                 src={selectedSvc.imageUrl || catImg(selectedSvc.category)}
                 alt={selectedSvc.name}
                 onError={e => { (e.target as HTMLImageElement).src = catImg(selectedSvc.category); }}
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", background: "#f8f9fb" }}
               />
               <span style={{
                 position: "absolute", top: 12, left: 12,
@@ -684,12 +941,12 @@ export default function AdminDashboard() {
                 color: "#fff", fontSize: 11, fontWeight: 800,
                 padding: "4px 10px", borderRadius: 20,
               }}>
-                {selectedSvc.isActive ? "✓ LIVE" : "⏳ PENDING APPROVAL"}
+                {selectedSvc.isActive ? <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><CheckCircle2 size={12}/>LIVE</span> : <span style={{display:"inline-flex",alignItems:"center",gap:"4px"}}><Clock size={12}/>PENDING APPROVAL</span>}
               </span>
               <button
                 onClick={() => setSelectedSvc(null)}
-                style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,.5)", border: "none", color: "#fff", borderRadius: "50%", width: 32, height: 32, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
-              >×</button>
+                style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,.5)", border: "none", color: "#fff", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              ><X size={18} /></button>
             </div>
 
             {/* Body */}
@@ -746,7 +1003,7 @@ export default function AdminDashboard() {
                       setSelectedSvc(prev => prev ? { ...prev, isActive: true } : null);
                     }}
                   >
-                    {actionId === selectedSvc.id ? "..." : "✓ Approve & Go Live"}
+                    {actionId === selectedSvc.id ? "..." : <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}><CheckCircle2 size={14}/>Approve &amp; Go Live</span>}
                   </button>
                 ) : (
                   <button
@@ -758,7 +1015,7 @@ export default function AdminDashboard() {
                       setSelectedSvc(prev => prev ? { ...prev, isActive: false } : null);
                     }}
                   >
-                    {actionId === selectedSvc.id ? "..." : "✗ Take Offline"}
+                    {actionId === selectedSvc.id ? "..." : <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}><X size={14}/>Take Offline</span>}
                   </button>
                 )}
                 <button

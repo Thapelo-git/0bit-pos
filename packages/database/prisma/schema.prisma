@@ -24,6 +24,11 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum PayoutStatus {
+  PENDING
+  PAID
+}
+
 enum AccountStatus {
   PENDING
   ACTIVE
@@ -150,6 +155,7 @@ model Service {
   isActive        Boolean       @default(false)
   isDeal          Boolean       @default(false)
   originalPrice   Float?
+  dealExpiresAt   DateTime?
   bookings        Booking[]
   reviews         Review[]
 
@@ -188,6 +194,8 @@ model Booking {
   notes         String?
   address       String?
   paymentMethod String?
+  payoutStatus  PayoutStatus  @default(PENDING)
+  payoutDate    DateTime?
 
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Clock, Heart, X } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -9,7 +10,7 @@ const FAV_KEY = "kasifix_favorites";
 const CATEGORY_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=400&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=400&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=400&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=400&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=400&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=400&auto=format&fit=crop",
 };
@@ -47,7 +48,7 @@ export default function FavoritesPage() {
 
   if (loading) return (
     <div style={{ padding: "80px 20px", textAlign: "center", fontFamily: "sans-serif", color: "#71717A" }}>
-      <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>Loading…
+      <div style={{ marginBottom: "12px", display:"flex", justifyContent:"center" }}><Clock size={32}/></div>Loading…
     </div>
   );
 
@@ -64,7 +65,7 @@ export default function FavoritesPage() {
       <div style={{ fontFamily: "sans-serif" }}>
         {signInBanner}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "50vh", textAlign: "center" }}>
-          <div style={{ fontSize: "72px", marginBottom: 20 }}>🤍</div>
+          <div style={{ marginBottom: 20, display:"flex", justifyContent:"center" }}><Heart size={72} color="#e5e7eb"/></div>
           <h1 style={{ fontSize: 24, fontWeight: 900, color: "#0A0A0A", margin: "0 0 10px" }}>No favourites yet</h1>
           <p style={{ fontSize: 15, color: "#71717A", maxWidth: 360, margin: "0 0 28px", lineHeight: 1.7 }}>
             Tap the ♡ heart on any service to save it here for later.
@@ -86,7 +87,9 @@ export default function FavoritesPage() {
         .fav-sub       { font-size:14px; color:#71717A; margin:0 0 20px; }
         .fav-grid      { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:18px; }
         .fav-card      { background:#fff; border:1.5px solid #eaeaea; border-radius:14px; overflow:hidden; }
-        .fav-img       { width:100%; height:160px; object-fit:cover; display:block; }
+        .fav-img-wrap  { position:relative; height:160px; overflow:hidden; background:#111; }
+        .fav-img-wrap .img-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:blur(14px) brightness(.5); transform:scale(1.15); display:block; }
+        .fav-img-wrap .img-fg { position:relative; width:100%; height:100%; object-fit:contain; display:block; z-index:1; }
         .fav-body      { padding:14px; }
         .fav-cat       { display:inline-block; background:#fee2e2; color:${RED}; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:700; margin-bottom:6px; }
         .fav-name      { font-size:14px; font-weight:800; color:#0A0A0A; margin-bottom:4px; }
@@ -106,12 +109,10 @@ export default function FavoritesPage() {
         <div className="fav-grid">
           {favs.map(fav => (
             <div key={fav.id} className="fav-card">
-              <img
-                className="fav-img"
-                src={fav.imageUrl || CATEGORY_IMAGES[fav.category] || fallback}
-                alt={fav.name}
-                onError={e => { (e.target as HTMLImageElement).src = fallback; }}
-              />
+              <div className="fav-img-wrap">
+                <img className="img-bg" src={fav.imageUrl || CATEGORY_IMAGES[fav.category] || fallback} alt="" aria-hidden />
+                <img className="img-fg" src={fav.imageUrl || CATEGORY_IMAGES[fav.category] || fallback} alt={fav.name} onError={e => { (e.target as HTMLImageElement).src = fallback; }} />
+              </div>
               <div className="fav-body">
                 <span className="fav-cat">{fav.category}</span>
                 <div className="fav-name">{fav.name}</div>
@@ -120,7 +121,7 @@ export default function FavoritesPage() {
                   <span className="fav-price">R {Number(fav.price).toFixed(2)}</span>
                   <div className="fav-actions">
                     <Link href={`/services/${fav.id}`} className="fav-book">Book</Link>
-                    <button className="fav-remove" onClick={() => removeFav(fav.id)} title="Remove from favourites">✕</button>
+                    <button className="fav-remove" onClick={() => removeFav(fav.id)} title="Remove from favourites" style={{display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14}/></button>
                   </div>
                 </div>
               </div>

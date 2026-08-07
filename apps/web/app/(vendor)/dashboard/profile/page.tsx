@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil, CheckCircle2 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED = "#DC143C";
@@ -42,7 +43,10 @@ export default function VendorProfilePage() {
     phone:        "",
     locationText: "",
     bankDetails:  "",
+    latitude:     null as number | null,
+    longitude:    null as number | null,
   });
+  const [locLoading, setLocLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/vendors/profile`, { credentials: "include" })
@@ -58,6 +62,8 @@ export default function VendorProfilePage() {
             phone:        p?.phone        || u.phone || "",
             locationText: p?.locationText || "",
             bankDetails:  p?.bankDetails  || "",
+            latitude:     p?.latitude     ?? null,
+            longitude:    p?.longitude    ?? null,
           });
         }
       })
@@ -165,7 +171,7 @@ export default function VendorProfilePage() {
             </div>
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               <button className="btn-outline" onClick={() => { setEditing(e => !e); setMsg(null); }}>
-                {editing ? "Cancel" : "✏ Edit Profile"}
+                {editing ? "Cancel" : <span style={{display:"inline-flex",alignItems:"center",gap:"6px"}}><Pencil size={14}/>Edit Profile</span>}
               </button>
               <button className="btn-danger" onClick={handleLogout}>
                 Sign Out
@@ -182,7 +188,7 @@ export default function VendorProfilePage() {
           <div className="vp-section-hdr">
             <h3 className="vp-section-ttl">Business Details</h3>
             {!editing && profile?.isActive && (
-              <span style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>✓ Profile Active</span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#10b981", display:"inline-flex", alignItems:"center", gap:"4px" }}><CheckCircle2 size={13}/>Profile Active</span>
             )}
           </div>
 
@@ -221,6 +227,25 @@ export default function VendorProfilePage() {
                     onChange={e => setForm(p => ({ ...p, locationText: e.target.value }))}
                     placeholder="e.g. Soweto, Johannesburg"
                   />
+                  <button
+                    type="button"
+                    disabled={locLoading}
+                    onClick={() => {
+                      if (!navigator.geolocation) return;
+                      setLocLoading(true);
+                      navigator.geolocation.getCurrentPosition(
+                        pos => {
+                          setForm(p => ({ ...p, latitude: pos.coords.latitude, longitude: pos.coords.longitude }));
+                          setLocLoading(false);
+                        },
+                        () => setLocLoading(false),
+                        { timeout: 8000 }
+                      );
+                    }}
+                    style={{ marginTop: 6, background: "none", border: "1.5px solid #eaeaea", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#374151", display: "inline-flex", alignItems: "center", gap: 5 }}
+                  >
+                    📍 {locLoading ? "Detecting…" : form.latitude ? `Location saved (${form.latitude.toFixed(3)}, ${form.longitude?.toFixed(3)})` : "Use my current location"}
+                  </button>
                 </div>
               </div>
               <div className="vp-row">

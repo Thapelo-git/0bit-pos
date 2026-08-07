@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useCart } from "../../../src/shared/context/CartContext";
+import { CheckCircle2, X, Search, MapPin, Loader2 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 const RED  = "#DC143C";
@@ -11,7 +12,7 @@ const CATEGORIES = [
   "All",
   "Home Cleaning",
   "Fitness & Wellness",
-  "Personal Services",
+  "Beauty & Grooming",
   "Home Maintenance & Trades",
   "Professional Training & Coaching",
   "Other Local Services",
@@ -20,7 +21,7 @@ const CATEGORIES = [
 const PLACEHOLDER_IMAGES: Record<string, string> = {
   "Home Cleaning":                    "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=600&auto=format&fit=crop",
   "Fitness & Wellness":               "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=600&auto=format&fit=crop",
-  "Personal Services":                "https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=600&auto=format&fit=crop",
+  "Beauty & Grooming":               "https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=600&auto=format&fit=crop",
   "Home Maintenance & Trades":        "https://images.unsplash.com/photo-1581141849291-1125c7b692b5?q=80&w=600&auto=format&fit=crop",
   "Professional Training & Coaching": "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=600&auto=format&fit=crop",
   "Other Local Services":             "https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=600&auto=format&fit=crop",
@@ -50,10 +51,14 @@ function ServicesContent() {
 
   const [services,    setServices]    = useState<any[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [fetchError,  setFetchError]  = useState(false);
   const [category,    setCategory]    = useState(initCategory);
   const [search,      setSearch]      = useState(initSearch);
   const [minPrice,    setMinPrice]    = useState(Number(searchParams.get("minPrice") || 0));
   const [maxPrice,    setMaxPrice]    = useState(Number(searchParams.get("maxPrice") || 0));
+  const [userCoords,  setUserCoords]  = useState<{ lat: number; lng: number } | null>(null);
+  const [locStatus,   setLocStatus]   = useState<"idle" | "loading" | "granted" | "denied">("idle");
+  const categoryRef = useRef(initCategory);
   const [page,        setPage]        = useState(1);
 
   // AI Smart Search
@@ -76,29 +81,51 @@ function ServicesContent() {
 
   const PER_PAGE = 12;
 
-  useEffect(() => {
+  const loadServices = (cat: string, coords?: { lat: number; lng: number } | null) => {
     setLoading(true);
+    setFetchError(false);
     const params = new URLSearchParams();
-    if (category !== "All") params.set("category", category);
-    const qs = params.toString();
-    fetch(`${API}/clients/services/search${qs ? `?${qs}` : ""}`)
+    if (cat !== "All") params.set("category", cat);
+    if (coords) { params.set("lat", String(coords.lat)); params.set("lng", String(coords.lng)); }
+    const qs  = params.toString();
+    const ctl = new AbortController();
+    const tid = setTimeout(() => ctl.abort(), 10000);
+    fetch(`${API}/clients/services/search${qs ? `?${qs}` : ""}`, { signal: ctl.signal })
       .then(r => r.json())
       .then(j => { if (j.status === "success") setServices(j.data || []); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [category]);
+      .catch(() => setFetchError(true))
+      .finally(() => { clearTimeout(tid); setLoading(false); });
+  };
 
-  // Keep state in sync when searchParams change externally (e.g. from layout search / price filter)
+  // Request geolocation once on mount — use ref so no searchParams dep needed
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    setLocStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserCoords(coords);
+        setLocStatus("granted");
+        loadServices(categoryRef.current, coords);
+      },
+      () => setLocStatus("denied"),
+      { timeout: 8000 }
+    );
+  }, []);
+
+  // Sync state from URL then load; pass latest coords via functional updater
   useEffect(() => {
     const c   = searchParams.get("category") || "All";
     const s   = searchParams.get("search")   || "";
     const min = Number(searchParams.get("minPrice") || 0);
     const max = Number(searchParams.get("maxPrice") || 0);
+    categoryRef.current = c;
     setCategory(c);
     setSearch(s);
     setMinPrice(min);
     setMaxPrice(max);
     setPage(1);
+    setUserCoords(prev => { loadServices(c, prev); return prev; });
   }, [searchParams]);
 
   const filtered = services.filter(s => {
@@ -148,8 +175,9 @@ function ServicesContent() {
         .svc-grid         { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:20px; }
         .svc-card         { background:#fff; border:1.5px solid #eaeaea; border-radius:12px; overflow:hidden; cursor:pointer; transition:border-color .15s, box-shadow .15s; text-decoration:none; color:inherit; display:block; }
         .svc-card:hover   { border-color:${RED}; box-shadow:0 4px 20px rgba(220,20,60,.1); }
-        .svc-card-img     { height:160px; overflow:hidden; background:#f1f5f9; }
-        .svc-card-img img { width:100%; height:100%; object-fit:cover; display:block; }
+        .svc-card-img     { height:180px; position:relative; overflow:hidden; background:#111; }
+        .svc-card-img .img-bg  { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:blur(14px) brightness(.55); transform:scale(1.15); display:block; }
+        .svc-card-img .img-fg  { position:relative; width:100%; height:100%; object-fit:contain; display:block; z-index:1; }
         .svc-card-body    { padding:16px; }
         .svc-card-cat     { display:inline-block; background:#fee2e2; color:${RED}; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:700; margin-bottom:8px; }
         .svc-card-name    { font-weight:700; font-size:15px; color:#0A0A0A; margin-bottom:4px; }
@@ -208,7 +236,15 @@ function ServicesContent() {
       {/* Hero */}
       <div className="svc-hero">
         <h1 className="svc-hero-h1">Browse All Services</h1>
-        <p className="svc-hero-sub">Find trusted professionals across South Africa</p>
+        <p className="svc-hero-sub" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {locStatus === "loading" ? (
+            <><Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> Detecting your location…</>
+          ) : locStatus === "granted" ? (
+            <><MapPin size={13} /> Showing services nearest to you</>
+          ) : (
+            "Find trusted professionals across South Africa"
+          )}
+        </p>
 
         {search && (
           <p style={{ color: "rgba(255,255,255,.6)", fontSize: 13, margin: "0 0 4px" }}>
@@ -216,8 +252,8 @@ function ServicesContent() {
             <button
               type="button"
               onClick={() => { setSearch(""); setPage(1); const p = new URLSearchParams(); if (category !== "All") p.set("category", category); const q = p.toString(); router.push("/services" + (q ? "?" + q : "")); }}
-              style={{ marginLeft: 10, background: "none", border: "none", color: "rgba(255,255,255,.55)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0 }}
-            >✕ clear</button>
+              style={{ marginLeft: 10, background: "none", border: "none", color: "rgba(255,255,255,.55)", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0, display:"inline-flex", alignItems:"center", gap:"3px" }}
+            ><X size={12}/>clear</button>
           </p>
         )}
 
@@ -225,7 +261,7 @@ function ServicesContent() {
           className={`ai-toggle${aiOpen ? " open" : ""}`}
           onClick={() => { setAiOpen(o => !o); setAiResults(null); }}
         >
-          {aiOpen ? "✕ Close" : "✨ Smart Search"}
+          {aiOpen ? <span style={{display:"inline-flex",alignItems:"center",gap:"5px"}}><X size={13}/>Close</span> : "✨ Smart Search"}
         </button>
 
         {aiOpen && (
@@ -239,8 +275,8 @@ function ServicesContent() {
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAiSearch(); } }}
             />
             <div className="ai-actions">
-              <button className="ai-submit" onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()}>
-                {aiLoading ? "Thinking…" : "🔍 Search with AI"}
+              <button className="ai-submit" onClick={runAiSearch} disabled={aiLoading || !aiQuery.trim()} style={{display:"inline-flex",alignItems:"center",gap:"6px"}}>
+                {aiLoading ? "Thinking…" : <><Search size={14}/>Search with AI</>}
               </button>
               <span className="ai-hint">Detects category from your words</span>
             </div>
@@ -260,7 +296,7 @@ function ServicesContent() {
               <span>{aiResults.data.length} service{aiResults.data.length !== 1 ? "s" : ""} found</span>
             </div>
           </div>
-          <button className="ai-clear" onClick={() => setAiResults(null)}>✕ Clear</button>
+          <button className="ai-clear" onClick={() => setAiResults(null)} style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><X size={12}/>Clear</button>
         </div>
       )}
 
@@ -300,7 +336,7 @@ function ServicesContent() {
       ) : aiResults ? (
         aiResults.data.length === 0 ? (
           <div className="svc-empty">
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🤖</div>
+            <div style={{ fontSize: "48px", marginBottom: "16px", display:"flex", justifyContent:"center" }}>🤖</div>
             <h3 className="svc-empty-h3">No {aiResults.meta.category || "matching"} services yet</h3>
             <p style={{ marginBottom: 8 }}>
               AI matched your search to <strong>{aiResults.meta.category || "a category"}</strong> but no providers have listed services there yet.
@@ -314,17 +350,24 @@ function ServicesContent() {
           <div className="svc-grid">
             {aiResults.data.map((svc: any) => (
               <Link key={svc.id} href={`/services/${svc.id}`} className="svc-card">
-                <div className="svc-card-img" style={{ position: "relative" }}>
-                  <img src={svc.imageUrl || getImage(svc.category)} alt={svc.name} onError={e => { (e.target as HTMLImageElement).src = getImage(svc.category); }} />
-                  {svc.isDeal && <span style={{ position: "absolute", top: 8, right: 8, background: "#f59e0b", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px" }}>🔥 DEAL</span>}
+                <div className="svc-card-img">
+                  <img className="img-bg" src={svc.imageUrl || getImage(svc.category)} alt="" aria-hidden />
+                  <img className="img-fg" src={svc.imageUrl || getImage(svc.category)} alt={svc.name} onError={e => { (e.target as HTMLImageElement).src = getImage(svc.category); }} />
+                  {svc.isDeal && <span style={{ position: "absolute", top: 8, right: 8, background: "#f59e0b", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px", zIndex: 2 }}>🔥 DEAL</span>}
                 </div>
                 <div className="svc-card-body">
                   <span className="svc-card-cat">{svc.category}</span>
                   <div className="svc-card-name">{svc.name}</div>
                   <div className="svc-card-vendor">
                     {svc.vendorProfile?.businessName}
-                    {svc.vendorProfile?.isVerified && <span className="svc-verified">✓ Verified</span>}
+                    {svc.vendorProfile?.isVerified && <span className="svc-verified" style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={10}/>Verified</span>}
+                    {svc.distance != null && <span style={{marginLeft:"auto",color:"#6b7280",fontSize:11,display:"inline-flex",alignItems:"center",gap:2}}><MapPin size={10}/>{Number(svc.distance).toFixed(1)} km</span>}
                   </div>
+                  {svc.vendorProfile?.locationText && (
+                    <div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#6b7280",marginBottom:6}}>
+                      <MapPin size={10}/>{svc.vendorProfile.locationText}
+                    </div>
+                  )}
                   {svc.reviewCount > 0 && (
                     <div className="svc-stars">
                       <Stars rating={svc.avgRating} />
@@ -335,7 +378,7 @@ function ServicesContent() {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span className="svc-card-price">R {Number(svc.price).toFixed(2)}</span>
                     <button className="svc-card-book" onClick={e => { e.preventDefault(); addItem({ id: svc.id, name: svc.name, price: Number(svc.price), category: svc.category, imageUrl: svc.imageUrl, vendorName: svc.vendorProfile?.businessName }); }}>
-                      {isInCart(svc.id) ? "✓ Added" : "+ Booking"}
+                      {isInCart(svc.id) ? <span style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={12}/>Added</span> : "+ Booking"}
                     </button>
                   </div>
                 </div>
@@ -347,9 +390,21 @@ function ServicesContent() {
         <div className="svc-grid">
           {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="svc-skeleton" />)}
         </div>
+      ) : fetchError ? (
+        <div className="svc-empty">
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
+          <h3 className="svc-empty-h3">Could not load services</h3>
+          <p style={{ marginBottom: 20 }}>The server took too long to respond. Please check your connection and try again.</p>
+          <button
+            onClick={() => loadServices(category)}
+            style={{ background: RED, color: "#fff", border: "none", padding: "10px 24px", borderRadius: "6px", fontWeight: 700, cursor: "pointer" }}
+          >
+            Retry
+          </button>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="svc-empty">
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
+          <div style={{ marginBottom: "16px", display:"flex", justifyContent:"center" }}><Search size={48} color="#71717A"/></div>
           <h3 className="svc-empty-h3">No services found</h3>
           <p>Try a different category or search term.</p>
           <button
@@ -365,20 +420,12 @@ function ServicesContent() {
             <Link key={svc.id} href={`/services/${svc.id}`} className="svc-card">
               <div style={{ position: "relative" }}>
                 <div className="svc-card-img">
-                  <img
-                    src={svc.imageUrl || getImage(svc.category)}
-                    alt={svc.name}
-                    onError={e => { (e.target as HTMLImageElement).src = getImage(svc.category); }}
-                  />
+                  <img className="img-bg" src={svc.imageUrl || getImage(svc.category)} alt="" aria-hidden />
+                  <img className="img-fg" src={svc.imageUrl || getImage(svc.category)} alt={svc.name} onError={e => { (e.target as HTMLImageElement).src = getImage(svc.category); }} />
                 </div>
                 {svc.isDeal && (
-                  <span style={{ position: "absolute", top: 8, right: 8, background: "#f59e0b", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px" }}>
+                  <span style={{ position: "absolute", top: 8, right: 8, background: "#f59e0b", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px", zIndex: 2 }}>
                     🔥 DEAL
-                  </span>
-                )}
-                {svc.vendorProfile?.isVerified && (
-                  <span style={{ position: "absolute", top: 8, left: 8, background: "#15803d", color: "#fff", fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "4px", display: "flex", alignItems: "center", gap: 4 }}>
-                    ✓ Verified
                   </span>
                 )}
               </div>
@@ -387,8 +434,13 @@ function ServicesContent() {
                 <div className="svc-card-name">{svc.name}</div>
                 <div className="svc-card-vendor">
                   {svc.vendorProfile?.businessName || "Verified Provider"}
-                  {svc.vendorProfile?.isVerified && <span className="svc-verified">✓ Verified</span>}
+                  {svc.vendorProfile?.isVerified && <span className="svc-verified" style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={10}/>Verified</span>}
                 </div>
+                {svc.vendorProfile?.locationText && (
+                  <div style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:"#6b7280",marginBottom:6}}>
+                    <MapPin size={10}/>{svc.vendorProfile.locationText}
+                  </div>
+                )}
                 {svc.reviewCount > 0 ? (
                   <div className="svc-stars">
                     <Stars rating={svc.avgRating} size={12} />
@@ -420,7 +472,7 @@ function ServicesContent() {
                       });
                     }}
                   >
-                    {isInCart(svc.id) ? "✓ Added" : "Add to Booking"}
+                    {isInCart(svc.id) ? <span style={{display:"inline-flex",alignItems:"center",gap:"3px"}}><CheckCircle2 size={12}/>Added</span> : "Add to Booking"}
                   </button>
                 </div>
               </div>

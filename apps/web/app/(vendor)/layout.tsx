@@ -2,16 +2,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LayoutDashboard, CreditCard, BarChart2, User, LogOut } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 
 const RED = "#DC143C";
 
 const NAV_ITEMS = [
-  { label: "Dashboard",    href: "/dashboard",              icon: "📊" },
-  { label: "Transactions", href: "/dashboard/transactions", icon: "💳" },
-  { label: "Reports",      href: "/dashboard/reports",      icon: "📈" },
-  { label: "Profile",      href: "/dashboard/profile",      icon: "👤" },
+  { label: "Dashboard",    href: "/dashboard",              icon: <LayoutDashboard size={16}/> },
+  { label: "Transactions", href: "/dashboard/transactions", icon: <CreditCard size={16}/> },
+  { label: "Reports",      href: "/dashboard/reports",      icon: <BarChart2 size={16}/> },
+  { label: "Profile",      href: "/dashboard/profile",      icon: <User size={16}/> },
 ];
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
@@ -57,7 +58,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
                 transition: "all .15s",
               }}
             >
-              <span style={{ fontSize: "16px" }}>{item.icon}</span>
+              <span style={{ display:"flex", alignItems:"center" }}>{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           );
@@ -93,7 +94,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
             display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
           }}
         >
-          <span>⎋</span> Sign Out
+          <LogOut size={16}/> Sign Out
         </button>
       </div>
     </>
