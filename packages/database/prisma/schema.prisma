@@ -165,6 +165,8 @@ model Service {
   @@index([vendorProfileId])
   @@index([category])
   @@index([isDeal])
+  @@index([isActive, category])
+  @@index([isActive, isDeal])
 }
 
 model Review {

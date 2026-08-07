@@ -19,8 +19,11 @@ export const searchServices = catchAsync(async (req: Request, res: Response) => 
 
   if (!lat || !lng) {
     const services = await prisma.service.findMany({
-      where:   baseWhere,
-      include: {
+      where:  baseWhere,
+      select: {
+        id: true, name: true, price: true, category: true,
+        imageUrl: true, isActive: true, isDeal: true,
+        originalPrice: true, dealExpiresAt: true,
         vendorProfile: { select: { businessName: true, locationText: true, isVerified: true } },
         reviews:       { select: { rating: true } },
       },
@@ -29,6 +32,8 @@ export const searchServices = catchAsync(async (req: Request, res: Response) => 
 
     const data = services.map(s => ({
       ...s,
+      // Strip base64 images — they bloat the response by ~200KB per row
+      imageUrl:    s.imageUrl?.startsWith("data:") ? null : s.imageUrl,
       avgRating:   avgRating(s.reviews),
       reviewCount: s.reviews.length,
       reviews:     undefined,
@@ -41,26 +46,40 @@ export const searchServices = catchAsync(async (req: Request, res: Response) => 
   const longitude = parseFloat(String(lng));
 
   try {
-    const nearest = await prisma.$queryRawUnsafe(`
+    const rows = await prisma.$queryRawUnsafe(`
       SELECT
-        s.id, s.name, s.description, s.price, s.category, s."isActive", s."imageUrl",
-        v."latitude", v."longitude", v."businessName", v."isVerified", v."locationText",
-        (6371 * acos(
-          cos(radians(${latitude})) *
-          cos(radians(v."latitude")) *
-          cos(radians(v."longitude") - radians(${longitude})) +
-          sin(radians(${latitude})) *
-          sin(radians(v."latitude"))
-        )) AS distance
+        s.id, s.name, s.price, s.category, s."isActive", s."imageUrl",
+        s."isDeal", s."originalPrice", s."dealExpiresAt",
+        v."businessName", v."isVerified", v."locationText",
+        CASE
+          WHEN v."latitude" IS NOT NULL AND v."longitude" IS NOT NULL THEN
+            (6371 * acos(
+              GREATEST(-1, LEAST(1,
+                cos(radians(${latitude})) *
+                cos(radians(v."latitude")) *
+                cos(radians(v."longitude") - radians(${longitude})) +
+                sin(radians(${latitude})) *
+                sin(radians(v."latitude"))
+              ))
+            ))
+          ELSE NULL
+        END AS distance
       FROM "Service" s
       INNER JOIN "VendorProfile" v ON s."vendorProfileId" = v."id"
       WHERE s."isActive" = true AND v."isActive" = true
       ${category ? `AND s."category" = '${String(category).replace(/'/g, "''")}'` : ''}
-      ORDER BY distance ASC
+      ORDER BY distance ASC NULLS LAST
       LIMIT 50
-    `);
+    `) as any[];
 
-    return res.status(HttpStatus.OK).json({ status: "success", data: nearest });
+    // Strip base64 images from geo results too
+    const data = rows.map(r => ({
+      ...r,
+      imageUrl:     r.imageUrl?.startsWith?.("data:") ? null : r.imageUrl,
+      vendorProfile: { businessName: r.businessName, isVerified: r.isVerified, locationText: r.locationText },
+    }));
+
+    return res.status(HttpStatus.OK).json({ status: "success", data });
   } catch {
     return res.status(HttpStatus.BAD_REQUEST).json({ status: "fail", message: "Error calculating distance" });
   }
